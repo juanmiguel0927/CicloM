@@ -5,171 +5,82 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lunea - Rastreador de Ciclo</title>
     
-    <!-- Estilos CSS (Tailwind) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React y ReactDOM (Versiones estables de Cloudflare) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- React y ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Babel para traducir el código (Standalone) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        body { -webkit-tap-highlight-color: transparent; }
-        /* Animaciones suaves */
-        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* Ocultar barra de desplazamiento pero permitir scroll */
-        ::-webkit-scrollbar { width: 0px; background: transparent; }
-        
-        /* Loader simple para el inicio */
-        #loader { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: #64748b; font-family: sans-serif; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #f43f5e; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        body { -webkit-tap-highlight-color: transparent; background-color: #f8fafc; color: #1e293b; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #6366f1; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        /* Animación suave para celdas */
+        .day-cell { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .day-cell:active { transform: scale(0.90); }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 transition-colors duration-300">
-    
+<body>
+
     <!-- Contenedor Principal -->
     <div id="root">
-        <div id="loader">
+        <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
             <div class="spinner"></div>
-            <p>Iniciando Lunea...</p>
-            <p style="font-size: 10px; margin-top: 10px; opacity: 0.6;">Si esto tarda mucho, verifica tu conexión a internet.</p>
+            <p style="margin-top: 20px; font-family: sans-serif; color: #64748b;">Restaurando Lunea...</p>
+            <button onclick="localStorage.clear(); window.location.reload()" style="margin-top: 40px; padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer;">
+                Restablecer datos (Si falla)
+            </button>
         </div>
     </div>
 
-    <!-- Script de Error Handler (Por si falla React) -->
-    <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            document.getElementById('root').innerHTML = `
-                <div style="padding: 20px; color: #ef4444; font-family: sans-serif; text-align: center;">
-                    <h3 style="font-weight: bold;">Ocurrió un error al iniciar</h3>
-                    <p style="font-size: 12px; margin-top: 10px;">${message}</p>
-                    <p style="font-size: 10px; color: #94a3b8; margin-top: 5px;">Línea: ${lineno}</p>
-                </div>
-            `;
-        };
-    </script>
-
-    <!-- CÓDIGO DE LA APLICACIÓN -->
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
 
         // --- ICONOS ---
-        const Icon = ({ d, className }) => (
+        const Icon = ({ children, className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                {d}
+                {children}
             </svg>
         );
 
-        // Definición simplificada de iconos para evitar errores de sintaxis
         const Icons = {
-            Heart: (props) => <Icon {...props} d={<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />} />,
-            Calendar: (props) => <Icon {...props} d={<><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>} />,
-            Settings: (props) => <Icon {...props} d={<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.35a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />} />, // Simplified circle omitted for safety
-            ChevronLeft: (props) => <Icon {...props} d={<polyline points="15 18 9 12 15 6" />} />,
-            ChevronRight: (props) => <Icon {...props} d={<polyline points="9 18 15 12 9 6" />} />,
-            Sun: (props) => <Icon {...props} d={<><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></>} />,
-            Moon: (props) => <Icon {...props} d={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />} />,
-            Droplet: (props) => <Icon {...props} d={<path d="M12 2.69l5.74 5.88a6 6 0 0 1-8.48 8.48A6 6 0 0 1 5.25 9.56L12 2.69z" />} />,
-            Activity: (props) => <Icon {...props} d={<polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />} />,
-            Smile: (props) => <Icon {...props} d={<><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></>} />,
-            Frown: (props) => <Icon {...props} d={<><circle cx="12" cy="12" r="10" /><path d="M16 16s-1.5-2-4-2-4 2-4 2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></>} />,
-            Zap: (props) => <Icon {...props} d={<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />} />,
-            CloudRain: (props) => <Icon {...props} d={<><line x1="16" y1="13" x2="16" y2="21" /><line x1="8" y1="13" x2="8" y2="21" /><line x1="12" y1="15" x2="12" y2="23" /><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" /></>} />,
-            Thermometer: (props) => <Icon {...props} d={<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />} />,
-            Scale: (props) => <Icon {...props} d={<><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="M7 21h10" /><path d="M12 3v18" /><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" /></>} />,
-            Pill: (props) => <Icon {...props} d={<><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /><path d="m8.5 8.5 7 7" /></>} />,
-            CheckCircle: (props) => <Icon {...props} d={<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>} />,
-            Eye: (props) => <Icon {...props} d={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>} />,
-            EyeOff: (props) => <Icon {...props} d={<><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></>} />,
-            AlertCircle: (props) => <Icon {...props} d={<><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>} />
+            Heart: (p) => <Icon {...p}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></Icon>,
+            Calendar: (p) => <Icon {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></Icon>,
+            Settings: (p) => <Icon {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.35a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></Icon>,
+            ChevronLeft: (p) => <Icon {...p}><polyline points="15 18 9 12 15 6" /></Icon>,
+            ChevronRight: (p) => <Icon {...p}><polyline points="9 18 15 12 9 6" /></Icon>,
+            Sun: (p) => <Icon {...p}><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></Icon>,
+            Moon: (p) => <Icon {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></Icon>,
+            Droplet: (p) => <Icon {...p}><path d="M12 2.69l5.74 5.88a6 6 0 0 1-8.48 8.48A6 6 0 0 1 5.25 9.56L12 2.69z" /></Icon>,
+            Activity: (p) => <Icon {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></Icon>,
+            Smile: (p) => <Icon {...p}><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></Icon>,
+            Frown: (p) => <Icon {...p}><circle cx="12" cy="12" r="10" /><path d="M16 16s-1.5-2-4-2-4 2-4 2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></Icon>,
+            Zap: (p) => <Icon {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></Icon>,
+            CloudRain: (p) => <Icon {...p}><line x1="16" y1="13" x2="16" y2="21" /><line x1="8" y1="13" x2="8" y2="21" /><line x1="12" y1="15" x2="12" y2="23" /><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" /></Icon>,
+            Thermometer: (p) => <Icon {...p}><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" /></Icon>,
+            Scale: (p) => <Icon {...p}><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="M7 21h10" /><path d="M12 3v18" /><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" /></Icon>,
+            Pill: (p) => <Icon {...p}><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" /><path d="m8.5 8.5 7 7" /></Icon>,
+            CheckCircle: (p) => <Icon {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></Icon>,
+            Eye: (p) => <Icon {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></Icon>,
+            EyeOff: (p) => <Icon {...p}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></Icon>,
+            Users: (p) => <Icon {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></Icon>,
+            Trash: (p) => <Icon {...p}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></Icon>,
+            Download: (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></Icon>,
+            Upload: (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></Icon>,
+            Plus: (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></Icon>
         };
 
-        // --- DATOS ---
         const PHASES_DATA = {
-            MENSTRUAL: {
-                id: 'menstrual',
-                label: 'Menstruación',
-                discreteLabel: 'Fase 1',
-                color: 'bg-rose-500',
-                darkColor: 'bg-rose-600',
-                discreteColor: 'bg-slate-500',
-                lightColor: 'bg-rose-50',
-                darkLightColor: 'bg-rose-900/20', 
-                textColor: 'text-rose-600',
-                darkTextColor: 'text-rose-300',
-                discreteText: 'text-slate-600',
-                discreteLight: 'bg-slate-100',
-                desc: 'El revestimiento del útero se desprende.',
-                tips: 'Descansa, hidrátate bien y usa ropa cómoda.'
-            },
-            FOLLICULAR: {
-                id: 'follicular',
-                label: 'Fase Folicular',
-                discreteLabel: 'Fase 2',
-                color: 'bg-pink-300',
-                darkColor: 'bg-pink-500',
-                discreteColor: 'bg-slate-400',
-                lightColor: 'bg-pink-50',
-                darkLightColor: 'bg-pink-900/20',
-                textColor: 'text-pink-600',
-                darkTextColor: 'text-pink-300',
-                discreteText: 'text-slate-500',
-                discreteLight: 'bg-slate-50',
-                desc: 'El cuerpo se prepara para liberar un óvulo.',
-                tips: 'Buen momento para ejercicio y creatividad.'
-            },
-            FERTILE: {
-                id: 'fertile',
-                label: 'Ventana Fértil',
-                discreteLabel: 'Fase 3',
-                color: 'bg-purple-400',
-                darkColor: 'bg-purple-500',
-                discreteColor: 'bg-slate-400',
-                lightColor: 'bg-purple-50',
-                darkLightColor: 'bg-purple-900/20',
-                textColor: 'text-purple-600',
-                darkTextColor: 'text-purple-300',
-                discreteText: 'text-slate-600',
-                discreteLight: 'bg-slate-100',
-                desc: 'Alta probabilidad de embarazo.',
-                tips: 'Líbido alta, mayor sociabilidad.'
-            },
-            OVULATION: {
-                id: 'ovulation',
-                label: 'Ovulación',
-                discreteLabel: 'Pico',
-                color: 'bg-purple-600',
-                darkColor: 'bg-purple-600',
-                discreteColor: 'bg-slate-600',
-                lightColor: 'bg-purple-100',
-                darkLightColor: 'bg-purple-900/30',
-                textColor: 'text-purple-700',
-                darkTextColor: 'text-purple-300',
-                discreteText: 'text-slate-800',
-                discreteLight: 'bg-slate-200',
-                desc: 'El óvulo es liberado.',
-                tips: 'Posible dolor ligero o manchado.'
-            },
-            LUTEAL: {
-                id: 'luteal',
-                label: 'Fase Lútea',
-                discreteLabel: 'Fase 4',
-                color: 'bg-amber-300',
-                darkColor: 'bg-amber-500',
-                discreteColor: 'bg-slate-500',
-                lightColor: 'bg-amber-50',
-                darkLightColor: 'bg-amber-900/10',
-                textColor: 'text-amber-600',
-                darkTextColor: 'text-amber-300',
-                discreteText: 'text-slate-500',
-                discreteLight: 'bg-slate-50',
-                desc: 'El cuerpo se prepara para el siguiente ciclo.',
-                tips: 'Posible SPM. Prioriza el sueño.'
-            }
+            MENSTRUAL: { id: 'menstrual', label: 'Menstruación', discreteLabel: 'Fase 1', color: 'bg-rose-500', darkColor: 'bg-rose-600', discreteColor: 'bg-slate-500', lightColor: 'bg-rose-50', darkLightColor: 'bg-rose-900/20', textColor: 'text-rose-600', darkTextColor: 'text-rose-300', discreteText: 'text-slate-600', discreteLight: 'bg-slate-100', desc: 'Renovación.', tips: 'Descansa e hidrátate.' },
+            FOLLICULAR: { id: 'follicular', label: 'Fase Folicular', discreteLabel: 'Fase 2', color: 'bg-pink-300', darkColor: 'bg-pink-500', discreteColor: 'bg-slate-400', lightColor: 'bg-pink-50', darkLightColor: 'bg-pink-900/20', textColor: 'text-pink-600', darkTextColor: 'text-pink-300', discreteText: 'text-slate-500', discreteLight: 'bg-slate-50', desc: 'Preparación.', tips: 'Energía creativa.' },
+            FERTILE: { id: 'fertile', label: 'Ventana Fértil', discreteLabel: 'Fase 3', color: 'bg-purple-400', darkColor: 'bg-purple-500', discreteColor: 'bg-slate-400', lightColor: 'bg-purple-50', darkLightColor: 'bg-purple-900/20', textColor: 'text-purple-600', darkTextColor: 'text-purple-300', discreteText: 'text-slate-600', discreteLight: 'bg-slate-100', desc: 'Alta fertilidad.', tips: 'Sociabilidad alta.' },
+            OVULATION: { id: 'ovulation', label: 'Ovulación', discreteLabel: 'Pico', color: 'bg-purple-600', darkColor: 'bg-purple-600', discreteColor: 'bg-slate-600', lightColor: 'bg-purple-100', darkLightColor: 'bg-purple-900/30', textColor: 'text-purple-700', darkTextColor: 'text-purple-300', discreteText: 'text-slate-800', discreteLight: 'bg-slate-200', desc: 'Liberación óvulo.', tips: 'Posible dolor leve.' },
+            LUTEAL: { id: 'luteal', label: 'Fase Lútea', discreteLabel: 'Fase 4', color: 'bg-amber-300', darkColor: 'bg-amber-500', discreteColor: 'bg-slate-500', lightColor: 'bg-amber-50', darkLightColor: 'bg-amber-900/10', textColor: 'text-amber-600', darkTextColor: 'text-amber-300', discreteText: 'text-slate-500', discreteLight: 'bg-slate-50', desc: 'Pre-ciclo.', tips: 'Prioriza el sueño.' }
         };
 
         const SYMPTOMS_LIST = [
@@ -177,153 +88,201 @@
             { id: 'sad', label: 'Triste', icon: Icons.CloudRain },
             { id: 'irritable', label: 'Irritable', icon: Icons.Zap },
             { id: 'cramps', label: 'Cólicos', icon: Icons.Activity },
-            { id: 'headache', label: 'Dolor Cabeza', icon: Icons.Thermometer },
+            { id: 'headache', label: 'Dolor', icon: Icons.Thermometer },
             { id: 'bloating', label: 'Hinchazón', icon: Icons.Droplet },
-            { id: 'energetic', label: 'Con Energía', icon: Icons.Sun },
+            { id: 'energetic', label: 'Energía', icon: Icons.Sun },
             { id: 'tired', label: 'Cansada', icon: Icons.Frown },
         ];
 
-        // --- COMPONENTES AUXILIARES ---
+        // Componente Gráfico simple
         const SimpleChart = ({ data, colorClass, minVal, maxVal, isDark }) => {
             if (!data || data.length < 2) return <div className={`h-32 flex items-center justify-center text-xs rounded-xl border border-dashed ${isDark ? 'bg-slate-800 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>Registra al menos 2 datos</div>;
-
             const points = data.map((d, i) => {
                 const normalized = Math.max(0, Math.min(100, ((d.val - minVal) / (maxVal - minVal)) * 100));
                 const y = 100 - normalized; 
                 const x = (i / (data.length - 1)) * 100;
                 return `${x},${y}`;
             }).join(' ');
-
             return (
                 <div className="w-full h-32 relative mt-4">
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <line x1="0" y1="50" x2="100" y2="50" stroke={isDark ? "#334155" : "#f1f5f9"} strokeWidth="1" />
-                    <polyline fill="none" stroke="currentColor" strokeWidth="2" points={points} className={`${colorClass}`} />
-                    {data.map((d, i) => {
-                    const y = 100 - Math.max(0, Math.min(100, ((d.val - minVal) / (maxVal - minVal)) * 100));
-                    const x = (i / (data.length - 1)) * 100;
-                    return <circle key={i} cx={x} cy={y} r="2.5" className={`stroke-current ${isDark ? 'fill-slate-900' : 'fill-white'} ${colorClass}`} strokeWidth="1.5" />;
-                    })}
-                </svg>
+                    <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <line x1="0" y1="50" x2="100" y2="50" stroke={isDark ? "#334155" : "#f1f5f9"} strokeWidth="1" />
+                        <polyline fill="none" stroke="currentColor" strokeWidth="2" points={points} className={`${colorClass}`} />
+                        {data.map((d, i) => {
+                            const y = 100 - Math.max(0, Math.min(100, ((d.val - minVal) / (maxVal - minVal)) * 100));
+                            const x = (i / (data.length - 1)) * 100;
+                            return <circle key={i} cx={x} cy={y} r="2.5" className={`stroke-current ${isDark ? 'fill-slate-900' : 'fill-white'} ${colorClass}`} strokeWidth="1.5" />;
+                        })}
+                    </svg>
                 </div>
             );
         };
 
-        // --- COMPONENTE PRINCIPAL ---
         const App = () => {
-            const [userData, setUserData] = useState(() => {
-                const saved = localStorage.getItem('lunea_user_data');
-                return saved ? JSON.parse(saved) : {
-                    lastPeriodStart: new Date().toISOString().split('T')[0],
-                    baseCycleLength: 28,
-                    periodLength: 5,
-                    isRegular: true,
-                    trackPill: false,
-                    history: []
+            const [db, setDb] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('lunea_db');
+                    if (saved) return JSON.parse(saved);
+                } catch (e) {
+                    console.error("Error cargando datos, reiniciando DB");
+                }
+                const defaultUserId = Date.now().toString();
+                return {
+                    currentUserId: defaultUserId,
+                    users: [{
+                        id: defaultUserId,
+                        name: "Usuario Principal",
+                        userData: { lastPeriodStart: new Date().toISOString().split('T')[0], baseCycleLength: 28, periodLength: 5, isRegular: true, trackPill: false, history: [] },
+                        symptomsLog: {},
+                        dailyLog: {}
+                    }],
+                    theme: 'light'
                 };
             });
 
-            const [symptomsLog, setSymptomsLog] = useState(() => {
-                const saved = localStorage.getItem('lunea_symptoms');
-                return saved ? JSON.parse(saved) : {};
-            });
-
-            const [dailyLog, setDailyLog] = useState(() => {
-                const saved = localStorage.getItem('lunea_daily_log');
-                return saved ? JSON.parse(saved) : {}; 
-            });
-
-            const [darkMode, setDarkMode] = useState(() => {
-                return localStorage.getItem('lunea_theme') === 'dark';
-            });
-
-            const [currentDate, setCurrentDate] = useState(new Date());
+            const [darkMode, setDarkMode] = useState(db.theme === 'dark');
             const [view, setView] = useState('calendar');
             const [showSettings, setShowSettings] = useState(false);
             const [selectedDayInfo, setSelectedDayInfo] = useState(null);
             const [privacyMode, setPrivacyMode] = useState(false);
-
-            useEffect(() => localStorage.setItem('lunea_user_data', JSON.stringify(userData)), [userData]);
-            useEffect(() => localStorage.setItem('lunea_symptoms', JSON.stringify(symptomsLog)), [symptomsLog]);
-            useEffect(() => localStorage.setItem('lunea_daily_log', JSON.stringify(dailyLog)), [dailyLog]);
-            useEffect(() => localStorage.setItem('lunea_theme', darkMode ? 'dark' : 'light'), [darkMode]);
+            const [currentDate, setCurrentDate] = useState(new Date());
+            const fileInputRef = useRef(null);
 
             useEffect(() => {
-                if (darkMode) {
+                try {
+                    localStorage.setItem('lunea_db', JSON.stringify(db));
+                } catch (e) { console.error("Error guardando datos"); }
+            }, [db]);
+
+            useEffect(() => {
+                setDarkMode(db.theme === 'dark');
+                if (db.theme === 'dark') {
                     document.body.classList.add('bg-slate-950', 'text-slate-100');
                     document.body.classList.remove('bg-slate-50', 'text-slate-800');
                 } else {
                     document.body.classList.add('bg-slate-50', 'text-slate-800');
                     document.body.classList.remove('bg-slate-950', 'text-slate-100');
                 }
-            }, [darkMode]);
+            }, [db.theme]);
 
-            const formatDateKey = (date) => {
-                const d = new Date(date);
-                d.setHours(0,0,0,0);
-                const offset = d.getTimezoneOffset() * 60000;
-                return new Date(d.getTime() - offset).toISOString().split('T')[0];
+            const currentUser = useMemo(() => db.users.find(u => u.id === db.currentUserId) || db.users[0], [db]);
+
+            const updateCurrentUser = (field, value) => {
+                setDb(prev => ({
+                    ...prev,
+                    users: prev.users.map(u => u.id === prev.currentUserId ? { ...u, [field]: value } : u)
+                }));
             };
 
-            const calculatedAvgCycle = useMemo(() => {
-                if (!userData.history || userData.history.length < 2) return userData.baseCycleLength;
-                const recentHistory = userData.history.slice(-6);
-                const sum = recentHistory.reduce((acc, curr) => acc + curr.length, 0);
-                return Math.round(sum / recentHistory.length);
-            }, [userData.history, userData.baseCycleLength]);
+            const updateUserData = (subField, value) => {
+                setDb(prev => ({
+                    ...prev,
+                    users: prev.users.map(u => u.id === prev.currentUserId ? { ...u, userData: { ...u.userData, [subField]: value } } : u)
+                }));
+            };
 
-            const activeCycleLength = userData.isRegular ? userData.baseCycleLength : calculatedAvgCycle;
+            const handleAddUser = () => {
+                const name = prompt("Nombre:");
+                if (!name) return;
+                const newId = Date.now().toString();
+                setDb(prev => ({
+                    ...prev,
+                    users: [...prev.users, {
+                        id: newId,
+                        name: name,
+                        userData: { lastPeriodStart: new Date().toISOString().split('T')[0], baseCycleLength: 28, periodLength: 5, isRegular: true, trackPill: false, history: [] },
+                        symptomsLog: {},
+                        dailyLog: {}
+                    }],
+                    currentUserId: newId
+                }));
+            };
 
-            const getCycleDay = (targetDate) => {
-                const start = new Date(userData.lastPeriodStart);
-                start.setHours(0,0,0,0);
-                const target = new Date(targetDate);
-                target.setHours(0,0,0,0);
-                if (target < start) return null;
-                const diff = Math.floor((target - start) / (1000 * 60 * 60 * 24));
+            const handleDeleteUser = (id) => {
+                if (db.users.length <= 1) return alert("No puedes borrar el único usuario.");
+                if (confirm("¿Borrar usuario?")) {
+                    setDb(prev => {
+                        const newUsers = prev.users.filter(u => u.id !== id);
+                        return { ...prev, users: newUsers, currentUserId: prev.currentUserId === id ? newUsers[0].id : prev.currentUserId };
+                    });
+                }
+            };
+
+            const handleExport = () => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+                const node = document.createElement('a');
+                node.href = dataStr;
+                node.download = "lunea_backup.json";
+                document.body.appendChild(node);
+                node.click();
+                node.remove();
+            };
+
+            const handleFileChange = (e) => {
+                const reader = new FileReader();
+                reader.readAsText(e.target.files[0], "UTF-8");
+                reader.onload = (evt) => {
+                    try {
+                        const imported = JSON.parse(evt.target.result);
+                        if (imported.users) { setDb(imported); alert("Importado con éxito."); }
+                    } catch (err) { alert("Error al leer archivo."); }
+                };
+            };
+
+            const formatDateKey = (d) => {
+                const date = new Date(d);
+                date.setHours(0,0,0,0);
+                return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+            };
+
+            const activeCycleLength = useMemo(() => {
+                if (!currentUser.userData.isRegular && currentUser.userData.history.length >= 2) {
+                    const recent = currentUser.userData.history.slice(-6);
+                    return Math.round(recent.reduce((a, b) => a + b.length, 0) / recent.length);
+                }
+                return currentUser.userData.baseCycleLength;
+            }, [currentUser]);
+
+            const getCycleDay = (target) => {
+                const start = new Date(currentUser.userData.lastPeriodStart); start.setHours(0,0,0,0);
+                const t = new Date(target); t.setHours(0,0,0,0);
+                if (t < start) return null;
+                const diff = Math.floor((t - start) / 86400000);
                 return (diff % activeCycleLength) + 1;
             };
 
-            const getPhaseForDay = (dayNum) => {
-                if (!dayNum) return null;
-                const ovulationDay = activeCycleLength - 14;
-                if (dayNum <= userData.periodLength) return PHASES_DATA.MENSTRUAL;
-                if (dayNum >= ovulationDay - 5 && dayNum < ovulationDay) return PHASES_DATA.FERTILE;
-                if (dayNum === ovulationDay) return PHASES_DATA.OVULATION;
-                if (dayNum > ovulationDay + 1) return PHASES_DATA.LUTEAL;
-                if (dayNum > userData.periodLength && dayNum < ovulationDay - 5) return PHASES_DATA.FOLLICULAR;
+            const getPhase = (day) => {
+                if (!day) return null;
+                const ov = activeCycleLength - 14;
+                if (day <= currentUser.userData.periodLength) return PHASES_DATA.MENSTRUAL;
+                if (day >= ov - 5 && day < ov) return PHASES_DATA.FERTILE;
+                if (day === ov) return PHASES_DATA.OVULATION;
+                if (day > ov + 1) return PHASES_DATA.LUTEAL;
+                if (day > currentUser.userData.periodLength && day < ov - 5) return PHASES_DATA.FOLLICULAR;
                 return PHASES_DATA.LUTEAL;
             };
 
-            const handleAddCycleToHistory = () => {
-                const todayStr = formatDateKey(new Date());
-                const length = Math.floor((new Date() - new Date(userData.lastPeriodStart)) / (1000 * 60 * 60 * 24));
-                if (length < 15) { alert("Ciclo muy corto."); return; }
-                setUserData(prev => ({
-                    ...prev,
-                    lastPeriodStart: todayStr,
-                    history: [...prev.history, { startDate: userData.lastPeriodStart, endDate: todayStr, length }]
-                }));
-                setShowSettings(false);
+            const updateDailyLog = (dateKey, field, value) => {
+                const newDailyLog = {
+                    ...currentUser.dailyLog,
+                    [dateKey]: { ...currentUser.dailyLog[dateKey], [field]: value }
+                };
+                updateCurrentUser('dailyLog', newDailyLog);
             };
 
             const toggleSymptom = (dateKey, symptomId) => {
-                setSymptomsLog(prev => {
-                    const current = prev[dateKey] || [];
-                    const newSymptoms = current.includes(symptomId) ? current.filter(id => id !== symptomId) : [...current, symptomId];
-                    if (newSymptoms.length === 0) { const copy = {...prev}; delete copy[dateKey]; return copy; }
-                    return { ...prev, [dateKey]: newSymptoms };
-                });
+                const currentLog = currentUser.symptomsLog[dateKey] || [];
+                const newLog = currentLog.includes(symptomId) 
+                    ? currentLog.filter(id => id !== symptomId) 
+                    : [...currentLog, symptomId];
+                
+                const newSymptomsLog = { ...currentUser.symptomsLog };
+                if (newLog.length === 0) delete newSymptomsLog[dateKey];
+                else newSymptomsLog[dateKey] = newLog;
+
+                updateCurrentUser('symptomsLog', newSymptomsLog);
             };
 
-            const updateDailyLog = (dateKey, field, value) => {
-                setDailyLog(prev => ({
-                    ...prev,
-                    [dateKey]: { ...prev[dateKey], [field]: value }
-                }));
-            };
-
-            // Estilos dinámicos
             const theme = {
                 bg: darkMode ? 'bg-slate-950' : 'bg-slate-50',
                 text: darkMode ? 'text-slate-100' : 'text-slate-800',
@@ -337,66 +296,63 @@
                 tabBg: darkMode ? 'bg-slate-900/50' : 'bg-slate-200/50',
             };
 
+            const todayPhase = getPhase(getCycleDay(new Date()));
+            const gradientColor = privacyMode 
+                ? (darkMode ? 'from-slate-800 to-slate-700' : 'from-slate-700 to-slate-500')
+                : (darkMode ? 'from-rose-600 to-orange-600' : 'from-rose-400 to-orange-400');
+
             const renderCalendar = () => {
                 const year = currentDate.getFullYear();
                 const month = currentDate.getMonth();
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
                 const firstDay = new Date(year, month, 1).getDay();
                 const days = [];
-
-                for (let i = 0; i < firstDay; i++) days.push(<div key={`e-${i}`} />);
-
-                for (let i = 1; i <= daysInMonth; i++) {
+                for(let i=0; i<firstDay; i++) days.push(<div key={`e-${i}`}></div>);
+                for(let i=1; i<=daysInMonth; i++) {
                     const d = new Date(year, month, i);
                     const k = formatDateKey(d);
-                    const cycleDay = getCycleDay(d);
-                    const phase = getPhaseForDay(cycleDay);
+                    const cd = getCycleDay(d);
+                    const p = getPhase(cd);
                     const isToday = k === formatDateKey(new Date());
-                    const log = dailyLog[k] || {};
-                    const hasSymp = symptomsLog[k];
+                    const log = currentUser.dailyLog[k] || {};
+                    const hasSymp = currentUser.symptomsLog[k];
                     
-                    const hasWater = log.water >= 6;
-                    const pillTaken = log.pillTaken;
-
                     let bgClass = darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50';
                     let textClass = darkMode ? 'text-slate-400' : 'text-slate-500';
 
-                    if (phase) {
+                    if (p) {
                         if (privacyMode) {
-                            bgClass = darkMode ? 'bg-slate-800' : phase.discreteLight;
-                            textClass = darkMode ? 'text-slate-300' : phase.discreteText;
+                            bgClass = darkMode ? 'bg-slate-800' : p.discreteLight;
+                            textClass = darkMode ? 'text-slate-300' : p.discreteText;
                         } else {
-                            bgClass = darkMode ? phase.darkLightColor : phase.lightColor;
-                            textClass = darkMode ? phase.darkTextColor : phase.textColor;
+                            bgClass = darkMode ? p.darkLightColor : p.lightColor;
+                            textClass = darkMode ? p.darkTextColor : p.textColor;
                         }
                     }
 
                     days.push(
-                        <button
-                        key={i}
-                        onClick={() => setSelectedDayInfo({ date: d, dateKey: k, phase, cycleDay })}
-                        className={`h-12 rounded-xl flex flex-col items-center justify-start pt-1 relative transition-all border border-transparent ${bgClass} ${isToday ? 'ring-2 ring-indigo-500 font-bold z-10' : ''}`}
-                        >
-                        <span className={`text-xs ${textClass}`}>{i}</span>
-                        <div className="flex gap-0.5 mt-1 flex-wrap justify-center max-w-[90%]">
-                            {phase && <div className={`w-1 h-1 rounded-full ${privacyMode ? (darkMode ? 'bg-slate-500' : phase.discreteColor) : (darkMode ? phase.darkColor : phase.color)}`}></div>}
-                            {hasSymp && <div className="w-1 h-1 rounded-full bg-slate-400"></div>}
-                            {hasWater && <div className="w-1 h-1 rounded-full bg-blue-400"></div>}
-                            {pillTaken && <div className="w-1 h-1 rounded-full bg-green-500"></div>}
-                        </div>
+                        <button key={i} onClick={() => setSelectedDayInfo({ date: d, dateKey: k, phase: p, cycleDay: cd })} 
+                            className={`day-cell h-14 rounded-xl relative flex flex-col items-center justify-center border border-transparent ${bgClass} ${isToday ? 'ring-2 ring-indigo-500 z-10' : ''}`}>
+                            {cd && <span className={`absolute top-1 right-1.5 text-[9px] font-medium opacity-70 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{cd}</span>}
+                            <span className={`text-sm font-bold z-10 mb-1 ${textClass}`}>{i}</span>
+                            <div className="absolute bottom-1.5 flex gap-0.5 flex-wrap justify-center px-1">
+                                {p && <div className={`w-1 h-1 rounded-full ${privacyMode ? (darkMode ? 'bg-slate-500' : p.discreteColor) : (darkMode ? p.darkColor : p.color)}`}></div>}
+                                {hasSymp && <div className="w-1 h-1 rounded-full bg-slate-400"></div>}
+                                {log.water >= 6 && <div className="w-1 h-1 rounded-full bg-blue-400"></div>}
+                                {log.pillTaken && <div className="w-1 h-1 rounded-full bg-green-500"></div>}
+                            </div>
                         </button>
                     );
                 }
-
                 return (
                     <div className={`rounded-3xl p-5 shadow-sm border mb-6 ${theme.card}`}>
                         <div className="flex justify-between items-center mb-4">
-                        <button onClick={() => setCurrentDate(new Date(year, month - 1))} className={`p-2 rounded-full ${theme.button}`}><Icons.ChevronLeft className="w-5 h-5"/></button>
-                        <span className={`font-bold capitalize ${theme.text}`}>{currentDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</span>
-                        <button onClick={() => setCurrentDate(new Date(year, month + 1))} className={`p-2 rounded-full ${theme.button}`}><Icons.ChevronRight className="w-5 h-5"/></button>
+                            <button onClick={() => setCurrentDate(new Date(year, month - 1))} className={`p-2 rounded-full ${theme.button}`}><Icons.ChevronLeft className="w-5 h-5"/></button>
+                            <span className={`font-bold capitalize ${theme.text}`}>{currentDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</span>
+                            <button onClick={() => setCurrentDate(new Date(year, month + 1))} className={`p-2 rounded-full ${theme.button}`}><Icons.ChevronRight className="w-5 h-5"/></button>
                         </div>
                         <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-slate-400 font-bold uppercase mb-2">
-                        {['Do','Lu','Ma','Mi','Ju','Vi','Sa'].map(d => <div key={d}>{d}</div>)}
+                            {['Do','Lu','Ma','Mi','Ju','Vi','Sa'].map(d=><div key={d}>{d}</div>)}
                         </div>
                         <div className="grid grid-cols-7 gap-2">{days}</div>
                     </div>
@@ -405,204 +361,171 @@
 
             const renderReport = () => {
                 const today = new Date();
-                const chartData = [];
+                const tempChartData = [];
+                const weightChartData = [];
                 for(let i=14; i>=0; i--) {
                     const d = new Date();
                     d.setDate(today.getDate() - i);
                     const k = formatDateKey(d);
-                    if(dailyLog[k] && dailyLog[k].temp) chartData.push({ val: dailyLog[k].temp });
+                    const log = currentUser.dailyLog[k];
+                    if(log && log.temp) tempChartData.push({ val: log.temp });
+                    if(log && log.weight) weightChartData.push({ val: log.weight });
                 }
 
                 return (
                     <div className="space-y-6 animate-fade-in">
                         <div className={`p-6 rounded-3xl shadow-sm border ${theme.card}`}>
-                        <h3 className={`font-bold mb-4 flex items-center gap-2 ${theme.text}`}>
-                            <Icons.Activity className="w-5 h-5 text-indigo-500"/> Resumen de Ciclo
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className={`p-4 rounded-2xl ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                                <p className="text-xs text-slate-400 uppercase font-bold">Duración Media</p>
-                                <p className={`text-2xl font-black ${theme.text}`}>{activeCycleLength} <span className="text-sm font-normal text-slate-400">días</span></p>
-                            </div>
-                            <div className={`p-4 rounded-2xl ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                                <p className="text-xs text-slate-400 uppercase font-bold">Regularidad</p>
-                                <p className={`text-lg font-bold ${theme.text}`}>{userData.isRegular ? 'Regular' : 'Variable'}</p>
+                            <h3 className={`font-bold mb-4 flex items-center gap-2 ${theme.text}`}><Icons.Activity className="w-5 h-5 text-indigo-500"/> Resumen</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                                    <p className="text-xs text-slate-400 uppercase font-bold">Duración</p>
+                                    <p className={`text-2xl font-black ${theme.text}`}>{activeCycleLength} <span className="text-sm font-normal text-slate-400">días</span></p>
+                                </div>
+                                <div className={`p-4 rounded-2xl ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                                    <p className="text-xs text-slate-400 uppercase font-bold">Tipo</p>
+                                    <p className={`text-lg font-bold ${theme.text}`}>{currentUser.userData.isRegular ? 'Regular' : 'Variable'}</p>
+                                </div>
                             </div>
                         </div>
-                        </div>
-
                         <div className={`p-6 rounded-3xl shadow-sm border ${theme.card}`}>
-                        <h3 className={`font-bold flex items-center gap-2 ${theme.text}`}>
-                            <Icons.Thermometer className="w-5 h-5 text-rose-400" /> Temperatura
-                        </h3>
-                        <p className="text-xs text-slate-400">Últimos 14 días (Detecta ovulación)</p>
-                        <SimpleChart data={chartData} colorClass="text-rose-400" minVal={35.5} maxVal={37.5} isDark={darkMode} />
+                            <h3 className={`font-bold flex items-center gap-2 ${theme.text}`}><Icons.Thermometer className="w-5 h-5 text-rose-400" /> Temperatura</h3>
+                            <p className="text-xs text-slate-400">Últimos 14 días</p>
+                            <SimpleChart data={tempChartData} colorClass="text-rose-400" minVal={35.5} maxVal={37.5} isDark={darkMode} />
+                        </div>
+                        <div className={`p-6 rounded-3xl shadow-sm border ${theme.card}`}>
+                            <h3 className={`font-bold flex items-center gap-2 ${theme.text}`}><Icons.Scale className="w-5 h-5 text-teal-400" /> Peso</h3>
+                            <p className="text-xs text-slate-400">Últimos 14 días</p>
+                            <SimpleChart data={weightChartData} colorClass="text-teal-400" minVal={40} maxVal={100} isDark={darkMode} />
                         </div>
                     </div>
                 );
             };
-
-            const renderDayModal = () => {
-                if (!selectedDayInfo) return null;
-                const k = selectedDayInfo.dateKey;
-                const log = dailyLog[k] || {};
-
-                return (
-                    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center" onClick={() => setSelectedDayInfo(null)}>
-                        <div className={`w-full md:max-w-md rounded-t-3xl md:rounded-3xl p-6 shadow-2xl h-[90vh] md:h-auto overflow-y-auto animate-fade-in ${darkMode ? 'bg-slate-900 border border-slate-800' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <h3 className={`text-2xl font-bold capitalize ${theme.text}`}>
-                                    {selectedDayInfo.date.toLocaleDateString('es-ES', { weekday:'short', day:'numeric'})}
-                                </h3>
-                                <p className={`${theme.subText} text-sm font-medium`}>Día {selectedDayInfo.cycleDay}</p>
-                            </div>
-                            <button onClick={() => setSelectedDayInfo(null)} className={`p-2 rounded-full ${theme.button}`}>✕</button>
-                        </div>
-
-                        <div className="mb-6 grid grid-cols-2 gap-3">
-                            <div className={`${darkMode ? 'bg-blue-900/20' : 'bg-blue-50'} p-4 rounded-2xl flex flex-col items-center`}>
-                                <div className="flex items-center gap-2 text-blue-500 font-bold text-sm mb-2"><Icons.Droplet className="w-4 h-4" /> Agua</div>
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => updateDailyLog(k, 'water', Math.max(0, (log.water||0) - 1))} className={`w-8 h-8 rounded-full shadow-sm font-bold flex items-center justify-center ${darkMode ? 'bg-slate-800 text-blue-400' : 'bg-white text-blue-500'}`}>-</button>
-                                    <span className={`text-xl font-bold w-4 text-center ${theme.text}`}>{log.water || 0}</span>
-                                    <button onClick={() => updateDailyLog(k, 'water', (log.water||0) + 1)} className="w-8 h-8 rounded-full bg-blue-500 text-white shadow-sm font-bold flex items-center justify-center">+</button>
-                                </div>
-                            </div>
-                            <div className={`${darkMode ? 'bg-indigo-900/20' : 'bg-indigo-50'} p-4 rounded-2xl flex flex-col items-center`}>
-                                <div className="flex items-center gap-2 text-indigo-500 font-bold text-sm mb-2"><Icons.Moon className="w-4 h-4" /> Sueño</div>
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => updateDailyLog(k, 'sleep', Math.max(0, (log.sleep||0) - 1))} className={`w-8 h-8 rounded-full shadow-sm font-bold flex items-center justify-center ${darkMode ? 'bg-slate-800 text-indigo-400' : 'bg-white text-indigo-500'}`}>-</button>
-                                    <span className={`text-xl font-bold w-4 text-center ${theme.text}`}>{log.sleep || 7}</span>
-                                    <button onClick={() => updateDailyLog(k, 'sleep', (log.sleep||0) + 1)} className="w-8 h-8 rounded-full bg-indigo-500 text-white shadow-sm font-bold flex items-center justify-center">+</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mb-6 flex gap-3">
-                            {userData.trackPill && (
-                                <button 
-                                onClick={() => updateDailyLog(k, 'pillTaken', !log.pillTaken)}
-                                className={`flex-1 p-4 rounded-2xl flex items-center justify-center gap-2 border transition-all ${log.pillTaken ? 'bg-green-500/10 border-green-500 text-green-500' : `${theme.card} ${theme.subText}`}`}
-                                >
-                                {log.pillTaken ? <Icons.CheckCircle className="w-5 h-5"/> : <Icons.Pill className="w-5 h-5"/>}
-                                <span className="font-bold text-sm">{log.pillTaken ? 'Tomada' : 'Anticonceptivo'}</span>
-                                </button>
-                            )}
-                            <div className={`flex-1 rounded-2xl p-2 px-4 flex items-center justify-between ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                                <Icons.Scale className="w-5 h-5 text-slate-400" />
-                                <input type="number" placeholder="Kg" value={log.weight || ''} onChange={(e) => updateDailyLog(k, 'weight', e.target.value)} className={`w-16 bg-transparent text-right font-bold focus:outline-none ${theme.text}`}/>
-                                <span className="text-xs text-slate-400 ml-1">kg</span>
-                            </div>
-                        </div>
-
-                        <div className={`h-px my-4 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}></div>
-
-                        <div className="mb-6">
-                            <h4 className={`font-bold mb-3 text-sm flex items-center gap-2 ${theme.text}`}><Icons.Smile className="w-4 h-4 text-orange-400"/> Ánimo y Cuerpo</h4>
-                            <div className="grid grid-cols-4 gap-2">
-                                {SYMPTOMS_LIST.map(s => {
-                                    const active = (symptomsLog[k] || []).includes(s.id);
-                                    return (
-                                    <button key={s.id} onClick={() => toggleSymptom(k, s.id)} className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${active ? 'bg-indigo-500/10 border-indigo-500 text-indigo-500' : `${theme.card} ${theme.subText}`}`}>
-                                        <s.icon className={`w-6 h-6 mb-1 ${active ? 'stroke-2' : 'stroke-1'}`}/>
-                                        <span className="text-[10px] font-medium">{s.label}</span>
-                                    </button>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                        </div>
-                    </div>
-                );
-            };
-
-            const todayPhase = getPhaseForDay(getCycleDay(new Date()));
-            const gradientColor = privacyMode 
-                ? (darkMode ? 'from-slate-800 to-slate-700' : 'from-slate-700 to-slate-500')
-                : (darkMode ? 'from-rose-600 to-orange-600' : 'from-rose-400 to-orange-400');
 
             return (
                 <div className="max-w-md mx-auto min-h-screen pb-24 md:pb-0">
                     <header className={`backdrop-blur-md sticky top-0 z-30 px-5 py-3 border-b flex justify-between items-center ${theme.header}`}>
                         <div className="flex items-center gap-2">
-                        <div className={`bg-gradient-to-tr ${gradientColor} p-1.5 rounded-lg text-white shadow-sm`}>
-                            <Icons.Heart className="w-4 h-4 fill-current" />
-                        </div>
-                        <h1 className="text-lg font-bold">Lunea</h1>
+                            <div className={`bg-gradient-to-tr ${gradientColor} p-1.5 rounded-lg text-white shadow-sm`}>
+                                <Icons.Heart className="w-4 h-4 fill-current" />
+                            </div>
+                            <h1 className="text-lg font-bold">Lunea</h1>
                         </div>
                         <div className="flex gap-2">
-                        <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full transition-colors ${theme.button}`}>
-                            {darkMode ? <Icons.Sun className="w-5 h-5"/> : <Icons.Moon className="w-5 h-5"/>}
-                        </button>
-                        <button onClick={() => setPrivacyMode(!privacyMode)} className={`p-2 rounded-full transition-colors ${privacyMode ? 'bg-slate-200 text-slate-800' : theme.button}`}>
-                            {privacyMode ? <Icons.EyeOff className="w-5 h-5"/> : <Icons.Eye className="w-5 h-5"/>}
-                        </button>
-                        <button onClick={() => setShowSettings(true)} className={`p-2 rounded-full ${theme.button}`}><Icons.Settings className="w-5 h-5" /></button>
+                            <button onClick={() => setDb(p => ({...p, theme: darkMode ? 'light' : 'dark'}))} className={`p-2 rounded-full ${theme.button}`}>{darkMode ? <Icons.Sun className="w-5 h-5"/> : <Icons.Moon className="w-5 h-5"/>}</button>
+                            <button onClick={() => setPrivacyMode(!privacyMode)} className={`p-2 rounded-full ${privacyMode ? 'bg-slate-200 text-slate-800' : theme.button}`}>{privacyMode ? <Icons.EyeOff className="w-5 h-5"/> : <Icons.Eye className="w-5 h-5"/>}</button>
+                            <button onClick={() => setShowSettings(true)} className={`p-2 rounded-full ${theme.button}`}><Icons.Settings className="w-5 h-5"/></button>
                         </div>
                     </header>
 
                     {showSettings && (
                         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                        <div className={`rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-fade-in ${darkMode ? 'bg-slate-900 text-white' : 'bg-white'}`}>
-                            <div className="flex justify-between mb-4">
-                                <h2 className="font-bold text-lg">Ajustes</h2>
-                                <button onClick={() => setShowSettings(false)} className="text-slate-400">✕</button>
+                            <div className={`rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-fade-in ${darkMode ? 'bg-slate-900 text-white' : 'bg-white'} max-h-[90vh] overflow-y-auto`}>
+                                <div className="flex justify-between mb-4">
+                                    <h2 className="font-bold text-lg">Ajustes</h2>
+                                    <button onClick={() => setShowSettings(false)} className="text-slate-400">✕</button>
+                                </div>
+                                <div className={`p-4 rounded-2xl mb-4 ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                                    <div className="flex justify-between mb-2 text-sm font-bold text-indigo-500">
+                                        <div className="flex items-center gap-2"><Icons.Users className="w-4 h-4"/> Usuarios</div>
+                                        <button onClick={handleAddUser}><Icons.Plus className="w-4 h-4"/></button>
+                                    </div>
+                                    {db.users.map(u => (
+                                        <div key={u.id} className={`flex justify-between p-2 rounded ${u.id === db.currentUserId ? (darkMode ? 'bg-slate-700' : 'bg-white shadow') : ''}`}>
+                                            <button onClick={() => setDb(prev => ({...prev, currentUserId: u.id}))} className="text-sm font-medium">{u.name}</button>
+                                            {u.id !== db.currentUserId && <button onClick={() => handleDeleteUser(u.id)} className="text-red-400"><Icons.Trash className="w-4 h-4"/></button>}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="space-y-4">
+                                    <div><label className="text-xs font-bold text-slate-400 uppercase">Inicio</label><input type="date" value={currentUser.userData.lastPeriodStart} onChange={(e) => updateUserData('lastPeriodStart', e.target.value)} className={`w-full mt-1 p-3 rounded-xl border-none ring-1 ring-slate-500/20 ${theme.input}`}/></div>
+                                    <div><label className="text-xs font-bold text-slate-400 uppercase">Duración</label><input type="number" value={currentUser.userData.baseCycleLength} onChange={(e) => updateUserData('baseCycleLength', parseInt(e.target.value))} className={`w-full mt-1 p-3 rounded-xl border-none ring-1 ring-slate-500/20 ${theme.input}`}/></div>
+                                    <div className="flex gap-2">
+                                        <button onClick={handleExport} className={`flex-1 py-2 rounded-lg text-xs font-bold border ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>Exportar JSON</button>
+                                        <button onClick={() => fileInputRef.current.click()} className={`flex-1 py-2 rounded-lg text-xs font-bold border ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>Importar JSON</button>
+                                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json"/>
+                                    </div>
+                                    <div className="text-center pt-4 border-t border-slate-700/20">
+                                        <p className="text-xs text-slate-500 uppercase font-bold">Creado por</p>
+                                        <p className="font-medium text-indigo-500">Juan Miguel Rios Redondo</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="space-y-4">
-                                <div><label className="text-xs font-bold text-slate-400 uppercase">Inicio Periodo</label><input type="date" value={userData.lastPeriodStart} onChange={(e) => setUserData({...userData, lastPeriodStart: e.target.value})} className={`w-full mt-1 p-3 rounded-xl border-none ring-1 ring-slate-500/20 ${theme.input}`}/></div>
-                                <div className="flex gap-3">
-                                    <div className="flex-1"><label className="text-xs font-bold text-slate-400 uppercase">Ciclo</label><input type="number" value={userData.baseCycleLength} onChange={(e) => setUserData({...userData, baseCycleLength: parseInt(e.target.value)})} className={`w-full mt-1 p-3 rounded-xl border-none ring-1 ring-slate-500/20 ${theme.input}`}/></div>
-                                </div>
-                                <div className={`flex items-center gap-3 p-3 rounded-xl ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                                    <input type="checkbox" checked={userData.trackPill} onChange={(e) => setUserData({...userData, trackPill: e.target.checked})} className="w-5 h-5 text-indigo-500 rounded"/>
-                                    <div><p className="font-medium">Rastrear Pastilla</p></div>
-                                </div>
-                                <button onClick={handleAddCycleToHistory} className="w-full py-3 bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center gap-2">Nuevo Ciclo Hoy</button>
-                                
-                                <div className="pt-4 border-t border-slate-700/20 text-center">
-                                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Creado por</p>
-                                    <p className="font-medium text-indigo-500">Juan Miguel Rios Redondo</p>
-                                </div>
-                            </div>
-                        </div>
                         </div>
                     )}
 
                     <main className="p-4 md:p-6">
                         <div className={`flex p-1 rounded-xl mb-6 font-medium text-sm ${theme.tabBg}`}>
-                            <button onClick={() => setView('calendar')} className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition-all ${view === 'calendar' ? theme.tabActive : theme.tabInactive}`}><Icons.Calendar className="w-4 h-4"/> Diario</button>
-                            <button onClick={() => setView('report')} className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition-all ${view === 'report' ? theme.tabActive : theme.tabInactive}`}><Icons.Activity className="w-4 h-4"/> Salud</button>
+                            <button onClick={() => setView('calendar')} className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 ${view === 'calendar' ? theme.tabActive : theme.tabInactive}`}><Icons.Calendar className="w-4 h-4"/> Diario</button>
+                            <button onClick={() => setView('report')} className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-2 ${view === 'report' ? theme.tabActive : theme.tabInactive}`}><Icons.Activity className="w-4 h-4"/> Salud</button>
                         </div>
-
-                        {view === 'calendar' ? (
-                        <>
-                            <div className={`relative overflow-hidden rounded-[2.5rem] p-8 mb-6 text-center shadow-sm border ${todayPhase ? '' : theme.card} ${
-                                todayPhase 
-                                ? (privacyMode 
-                                    ? (darkMode ? 'bg-slate-800 border-slate-700' : todayPhase.discreteLight) 
-                                    : (darkMode ? todayPhase.darkLightColor + ' border-transparent' : todayPhase.lightColor + ' border-transparent')) 
-                                : ''
-                            }`}>
-                                <h2 className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">{new Date().toLocaleDateString('es-ES', {weekday:'long', day:'numeric'})}</h2>
-                                <div className="relative z-10 my-4">
-                                <span className={`text-6xl font-black tracking-tight ${todayPhase ? (privacyMode ? (darkMode ? 'text-slate-200' : todayPhase.discreteText) : (darkMode ? todayPhase.darkTextColor : todayPhase.textColor)) : 'text-slate-400'}`}>{getCycleDay(new Date()) || '?'}</span>
-                                <span className="text-sm font-medium text-slate-400 block -mt-1">Día del ciclo</span>
-                                </div>
-                                <div className={`inline-flex px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-white/10 backdrop-blur-sm ${todayPhase ? (privacyMode ? (darkMode ? 'text-slate-300' : todayPhase.discreteText) : (darkMode ? todayPhase.darkTextColor : todayPhase.textColor)) : 'text-slate-400'}`}>
-                                {todayPhase ? (privacyMode ? todayPhase.discreteLabel : todayPhase.label) : '...'}
-                                </div>
-                            </div>
-                            {renderCalendar()}
-                        </>
-                        ) : renderReport()}
+                        {view === 'calendar' ? renderCalendar() : renderReport()}
                     </main>
 
-                    <footer className="text-center py-6 text-xs text-slate-500">
-                        <p>Desarrollado con ❤️ por <span className="font-bold text-slate-400">Juan Miguel Rios Redondo</span></p>
-                    </footer>
+                    {selectedDayInfo && (
+                        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelectedDayInfo(null)}>
+                            <div className={`w-full max-w-sm rounded-3xl p-6 ${darkMode ? 'bg-slate-900 border border-slate-800' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className={`text-xl font-bold ${theme.text}`}>{selectedDayInfo.date.toLocaleDateString('es-ES', {weekday:'long', day:'numeric'})}</h3>
+                                    <button onClick={() => setSelectedDayInfo(null)}>✕</button>
+                                </div>
 
-                    {renderDayModal()}
+                                {/* SECCIÓN DE SALUD (RESTAURADA) */}
+                                <div className="mb-6 grid grid-cols-2 gap-3">
+                                    <div className={`${darkMode ? 'bg-blue-900/20' : 'bg-blue-50'} p-4 rounded-2xl flex flex-col items-center`}>
+                                        <div className="flex items-center gap-2 text-blue-500 font-bold text-sm mb-2"><Icons.Droplet className="w-4 h-4" /> Agua</div>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={() => updateDailyLog(selectedDayInfo.dateKey, 'water', Math.max(0, (currentUser.dailyLog[selectedDayInfo.dateKey]?.water||0) - 1))} className={`w-8 h-8 rounded-full shadow-sm font-bold flex items-center justify-center ${darkMode ? 'bg-slate-800 text-blue-400' : 'bg-white text-blue-500'}`}>-</button>
+                                            <span className={`text-xl font-bold w-4 text-center ${theme.text}`}>{currentUser.dailyLog[selectedDayInfo.dateKey]?.water || 0}</span>
+                                            <button onClick={() => updateDailyLog(selectedDayInfo.dateKey, 'water', (currentUser.dailyLog[selectedDayInfo.dateKey]?.water||0) + 1)} className="w-8 h-8 rounded-full bg-blue-500 text-white shadow-sm font-bold flex items-center justify-center">+</button>
+                                        </div>
+                                    </div>
+                                    <div className={`${darkMode ? 'bg-indigo-900/20' : 'bg-indigo-50'} p-4 rounded-2xl flex flex-col items-center`}>
+                                        <div className="flex items-center gap-2 text-indigo-500 font-bold text-sm mb-2"><Icons.Moon className="w-4 h-4" /> Sueño</div>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={() => updateDailyLog(selectedDayInfo.dateKey, 'sleep', Math.max(0, (currentUser.dailyLog[selectedDayInfo.dateKey]?.sleep||0) - 1))} className={`w-8 h-8 rounded-full shadow-sm font-bold flex items-center justify-center ${darkMode ? 'bg-slate-800 text-indigo-400' : 'bg-white text-indigo-500'}`}>-</button>
+                                            <span className={`text-xl font-bold w-4 text-center ${theme.text}`}>{currentUser.dailyLog[selectedDayInfo.dateKey]?.sleep || 7}</span>
+                                            <button onClick={() => updateDailyLog(selectedDayInfo.dateKey, 'sleep', (currentUser.dailyLog[selectedDayInfo.dateKey]?.sleep||0) + 1)} className="w-8 h-8 rounded-full bg-indigo-500 text-white shadow-sm font-bold flex items-center justify-center">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mb-6 flex gap-3">
+                                    {currentUser.userData.trackPill && (
+                                        <button onClick={() => updateDailyLog(selectedDayInfo.dateKey, 'pillTaken', !currentUser.dailyLog[selectedDayInfo.dateKey]?.pillTaken)}
+                                            className={`flex-1 p-4 rounded-2xl flex items-center justify-center gap-2 border transition-all ${currentUser.dailyLog[selectedDayInfo.dateKey]?.pillTaken ? 'bg-green-500/10 border-green-500 text-green-500' : `${theme.card} ${theme.subText}`}`}>
+                                            {currentUser.dailyLog[selectedDayInfo.dateKey]?.pillTaken ? <Icons.CheckCircle className="w-5 h-5"/> : <Icons.Pill className="w-5 h-5"/>}
+                                            <span className="font-bold text-sm">{currentUser.dailyLog[selectedDayInfo.dateKey]?.pillTaken ? 'Tomada' : 'Pastilla'}</span>
+                                        </button>
+                                    )}
+                                    <div className={`flex-1 rounded-2xl p-2 px-4 flex items-center justify-between ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                                        <Icons.Scale className="w-5 h-5 text-slate-400" />
+                                        <input type="number" placeholder="Kg" value={currentUser.dailyLog[selectedDayInfo.dateKey]?.weight || ''} onChange={(e) => updateDailyLog(selectedDayInfo.dateKey, 'weight', e.target.value)} className={`w-16 bg-transparent text-right font-bold focus:outline-none ${theme.text}`}/>
+                                        <span className="text-xs text-slate-400 ml-1">kg</span>
+                                    </div>
+                                </div>
+                                
+                                <div className={`p-4 rounded-2xl mb-6 flex items-center justify-between ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                                    <div className="flex items-center gap-2"><Icons.Thermometer className="w-5 h-5 text-rose-400"/> <span className={`text-sm font-bold ${theme.subText}`}>Temp. Basal</span></div>
+                                    <input type="number" step="0.1" placeholder="36.5" value={currentUser.dailyLog[selectedDayInfo.dateKey]?.temp || ''} onChange={(e) => updateDailyLog(selectedDayInfo.dateKey, 'temp', e.target.value)} className={`w-20 bg-transparent text-right font-bold focus:outline-none ${theme.text}`}/>
+                                </div>
+
+                                <div className={`h-px my-4 ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}></div>
+
+                                {/* SECCIÓN DE SÍNTOMAS */}
+                                <div className="grid grid-cols-4 gap-2 mb-4">
+                                    {SYMPTOMS_LIST.map(s => {
+                                        const active = (currentUser.symptomsLog[selectedDayInfo.dateKey] || []).includes(s.id);
+                                        return (
+                                            <button key={s.id} onClick={() => toggleSymptom(selectedDayInfo.dateKey, s.id)} className={`p-2 rounded-lg border flex flex-col items-center ${active ? 'bg-indigo-500/10 border-indigo-500 text-indigo-500' : `${theme.card} ${theme.subText}`}`}>
+                                                <s.icon className="w-5 h-5 mb-1"/>
+                                                <span className="text-[10px]">{s.label}</span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
