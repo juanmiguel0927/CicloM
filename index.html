@@ -39,6 +39,9 @@
     <!-- CONTENEDOR PRINCIPAL -->
     <div id="app" class="min-h-screen pb-24 relative"></div>
 
+    <!-- INPUT OCULTO PARA IMPORTAR -->
+    <input type="file" id="importFile" class="hidden" accept=".json" onchange="importData(this)">
+
     <!-- PANTALLA DE ERROR -->
     <div id="error-screen" class="hidden fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center p-8 text-center">
         <h2 class="text-red-500 font-bold text-xl mb-4">Error Crítico</h2>
@@ -67,11 +70,15 @@
             pill: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10"/><path d="M12 12 2 12"/></svg>',
             lock: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
             unlock: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>',
-            delete: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>'
+            delete: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>',
+            download: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+            upload: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
         };
 
         // --- ESTADO ---
-        const DB_KEY = 'lunea_v59_pin';
+        // Nombre estable para la DB para evitar pérdida de datos en futuras actualizaciones
+        const DB_KEY = 'lunea_master_db'; 
+        const LEGACY_KEYS = ['lunea_v59_pin', 'lunea_v58_pill', 'lunea_v57_final']; // Para migración
         let tutorialStep = 0; 
 
         let state = {
@@ -86,9 +93,25 @@
             inputPin: '' // Buffer temporal
         };
 
-        // Cargar
+        // Cargar con Migración
         try {
-            const saved = localStorage.getItem(DB_KEY);
+            // 1. Intentar cargar la DB maestra
+            let saved = localStorage.getItem(DB_KEY);
+            
+            // 2. Si no existe, buscar en versiones anteriores (Migración)
+            if (!saved) {
+                for (const key of LEGACY_KEYS) {
+                    const legacyData = localStorage.getItem(key);
+                    if (legacyData) {
+                        saved = legacyData;
+                        console.log('Datos migrados desde:', key);
+                        // Guardar inmediatamente en la nueva DB maestra
+                        localStorage.setItem(DB_KEY, saved);
+                        break; 
+                    }
+                }
+            }
+
             if (saved) {
                 const parsed = JSON.parse(saved);
                 state = { ...state, ...parsed, currentMonth: new Date(), viewYear: new Date().getFullYear(), selectedDate: null, inputPin: '' };
@@ -162,6 +185,56 @@
                 recalculateCycleStats(user);
                 save();
             }
+        };
+
+        // --- IMPORTAR / EXPORTAR ---
+        window.exportData = () => {
+            const dataStr = JSON.stringify(state);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const exportFileDefaultName = `lunea_backup_${new Date().toISOString().split('T')[0]}.json`;
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        };
+
+        window.triggerImport = () => {
+            document.getElementById('importFile').click();
+        };
+
+        window.importData = (input) => {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const loadedState = JSON.parse(e.target.result);
+                    // Validación básica
+                    if (!loadedState.users || !Array.isArray(loadedState.users)) {
+                        throw new Error("Formato inválido");
+                    }
+                    
+                    if(confirm("¿Estás seguro de restaurar esta copia? Se reemplazarán los datos actuales.")) {
+                        state = { ...state, ...loadedState };
+                        // Resetear vistas de sesión
+                        state.view = 'calendar';
+                        state.selectedDate = null;
+                        state.inputPin = '';
+                        state.currentMonth = new Date(); // Resetear fecha visual
+                        
+                        save();
+                        alert("Datos restaurados correctamente.");
+                        location.reload(); // Recargar para asegurar estado limpio
+                    }
+                } catch(err) {
+                    alert("Error al importar el archivo. Asegúrate de que es un respaldo válido de Lunea.");
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file);
+            input.value = ''; // Reset input
         };
 
         // --- LOGICA PIN ---
@@ -539,6 +612,21 @@
                     <div class="p-6 max-w-md mx-auto animate-in">
                         <div class="flex justify-between mb-6"><button onclick="setView('calendar')">${ICONS.left}</button><h2 class="text-xl font-bold">Ajustes</h2><div></div></div>
                         
+                        <!-- BACKUP SECTION -->
+                        <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
+                            <h3 class="font-bold mb-4 text-slate-800 text-lg flex gap-2 items-center text-emerald-600">${ICONS.download} Copia de Seguridad</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <button onclick="exportData()" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-emerald-50 hover:border-emerald-200 transition gap-2">
+                                    <div class="text-emerald-500">${ICONS.download}</div>
+                                    <span class="text-xs font-bold text-slate-700">Exportar Datos</span>
+                                </button>
+                                <button onclick="triggerImport()" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-blue-50 hover:border-blue-200 transition gap-2">
+                                    <div class="text-blue-500">${ICONS.upload}</div>
+                                    <span class="text-xs font-bold text-slate-700">Importar Datos</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
                             <h3 class="font-bold mb-4 text-slate-800 text-lg flex gap-2 items-center text-blue-600">${ICONS.lock} Seguridad</h3>
                             ${state.pin ? `
