@@ -23,6 +23,9 @@
         .toggle-checkbox:checked + .toggle-label {
             background-color: #f43f5e;
         }
+
+        /* Keypad animations */
+        .key-btn:active { background-color: #e2e8f0; transform: scale(0.95); }
         
         @media print {
             .no-print { display: none !important; }
@@ -61,11 +64,14 @@
             close: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
             check: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
             history: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>',
-            pill: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10"/><path d="M12 12 2 12"/></svg>'
+            pill: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10"/><path d="M12 12 2 12"/></svg>',
+            lock: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+            unlock: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>',
+            delete: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>'
         };
 
         // --- ESTADO ---
-        const DB_KEY = 'lunea_v58_pill';
+        const DB_KEY = 'lunea_v59_pin';
         let tutorialStep = 0; 
 
         let state = {
@@ -75,7 +81,9 @@
             selectedDate: null,
             users: [{ id: '1', name: 'Yo', config: { lastPeriod: new Date().toISOString().split('T')[0], cycleLen: 28, periodLen: 5, pill: false }, periodHistory: [], logs: {} }],
             currentUserId: '1',
-            showTutorial: true
+            showTutorial: true,
+            pin: null, // PIN global
+            inputPin: '' // Buffer temporal
         };
 
         // Cargar
@@ -83,11 +91,16 @@
             const saved = localStorage.getItem(DB_KEY);
             if (saved) {
                 const parsed = JSON.parse(saved);
-                state = { ...state, ...parsed, currentMonth: new Date(), viewYear: new Date().getFullYear(), selectedDate: null };
+                state = { ...state, ...parsed, currentMonth: new Date(), viewYear: new Date().getFullYear(), selectedDate: null, inputPin: '' };
                 // Asegurar array de historial
                 state.users.forEach(u => {
                     if (!u.periodHistory) u.periodHistory = [u.config.lastPeriod];
                 });
+
+                // Si hay PIN configurado, bloquear inmediatamente
+                if (state.pin) {
+                    state.view = 'locked';
+                }
             }
         } catch(e) { console.log('Error carga:', e); }
 
@@ -101,8 +114,6 @@
             if (!user.periodHistory || user.periodHistory.length < 2) return;
 
             const sortedHistory = [...user.periodHistory].sort((a, b) => new Date(a) - new Date(b));
-            
-            // Actualizar último periodo conocido
             const latest = sortedHistory[sortedHistory.length - 1];
             user.config.lastPeriod = latest;
 
@@ -115,7 +126,6 @@
                 const diffTime = Math.abs(curr - prev);
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 
-                // Permitir ciclos entre 15 y 50 días para el promedio
                 if (diffDays >= 15 && diffDays <= 50) {
                     totalDays += diffDays;
                     count++;
@@ -130,7 +140,6 @@
         function togglePeriodStart(dateStr) {
             const user = getUser();
             if (!user.periodHistory) user.periodHistory = [];
-
             if (user.periodHistory.includes(dateStr)) {
                 user.periodHistory = user.periodHistory.filter(d => d !== dateStr);
             } else {
@@ -140,7 +149,6 @@
             save();
         }
 
-        // Nueva función para ir a hoy
         window.goToToday = () => {
             state.currentMonth = new Date();
             state.viewYear = new Date().getFullYear();
@@ -156,23 +164,67 @@
             }
         };
 
+        // --- LOGICA PIN ---
+        window.typePin = (num) => {
+            if (state.inputPin.length < 4) {
+                state.inputPin += num;
+                render();
+                
+                // Verificar automáticamente al llegar a 4 dígitos
+                if (state.inputPin.length === 4) {
+                    setTimeout(() => {
+                        if (state.view === 'locked') {
+                            if (state.inputPin === state.pin) {
+                                state.view = 'calendar';
+                                state.inputPin = '';
+                            } else {
+                                alert('PIN Incorrecto');
+                                state.inputPin = '';
+                            }
+                        } else if (state.view === 'setup_pin') {
+                            state.pin = state.inputPin;
+                            state.view = 'settings';
+                            state.inputPin = '';
+                            alert('PIN Configurado con éxito');
+                        }
+                        render(); // Re-renderizar después del timeout para actualizar vista
+                        save();   // Guardar si hubo cambio de configuración
+                    }, 200); // Pequeño delay para ver el último dígito
+                }
+            }
+        };
+
+        window.deletePinDigit = () => {
+            state.inputPin = state.inputPin.slice(0, -1);
+            render();
+        };
+
+        window.startPinSetup = () => {
+            state.inputPin = '';
+            state.view = 'setup_pin';
+            render();
+        };
+
+        window.removePin = () => {
+            if(confirm('¿Eliminar el bloqueo por PIN?')) {
+                state.pin = null;
+                save();
+            }
+        };
+
         function getCycleDay(dateStr) {
             const user = getUser();
             const start = new Date(user.config.lastPeriod + 'T00:00:00');
             const target = new Date(dateStr + 'T00:00:00');
-            
-            // Búsqueda histórica retrospectiva
             if (target < start && user.periodHistory && user.periodHistory.length > 0) {
                 const sorted = [...user.periodHistory].sort((a, b) => new Date(b) - new Date(a));
                 const relevantStart = sorted.find(d => new Date(d + 'T00:00:00') <= target);
-                
                 if (relevantStart) {
                     const rStart = new Date(relevantStart + 'T00:00:00');
                     const diff = Math.floor((target - rStart) / 86400000);
                     return diff + 1;
                 }
             }
-
             const diff = Math.floor((target - start) / 86400000);
             if (diff < 0) return null;
             return (diff % user.config.cycleLen) + 1;
@@ -184,7 +236,6 @@
             if (!cd) return null;
             const ov = user.config.cycleLen - 14;
             const isStart = user.periodHistory && user.periodHistory.includes(dateStr);
-
             if (cd <= user.config.periodLen) return {l:'Menstruación', bg:'bg-rose-500', t:'text-rose-600', light:'bg-rose-100', isStart};
             if (cd >= ov - 5 && cd < ov) return {l:'Fértil', bg:'bg-purple-400', t:'text-purple-600', light:'bg-purple-100', isStart};
             if (cd === ov) return {l:'Ovulación', bg:'bg-purple-600', t:'text-purple-700', light:'bg-purple-200', isStart};
@@ -192,7 +243,6 @@
             return {l:'Folicular', bg:'bg-pink-300', t:'text-pink-600', light:'bg-pink-50', isStart};
         }
 
-        // --- ACCIONES GLOBAL ---
         window.hardReset = () => { localStorage.clear(); location.reload(); };
         window.setView = (v) => { state.view = v; render(); };
         window.closeModal = () => { state.selectedDate = null; render(); };
@@ -224,7 +274,6 @@
             if(field !== 'lastPeriod' && field !== 'pill') val = parseInt(val);
             if(field === 'pill') val = val === 'true'; 
             user.config[field] = val;
-            
             if (field === 'lastPeriod') {
                 if (!user.periodHistory.includes(val)) {
                     user.periodHistory.push(val);
@@ -234,17 +283,12 @@
             save();
         };
         
-        window.handlePeriodToggle = (dateStr) => {
-            togglePeriodStart(dateStr);
-            render(); 
-        };
-
+        window.handlePeriodToggle = (dateStr) => { togglePeriodStart(dateStr); render(); };
         window.addUser = () => { const n = prompt("Nombre:"); if (n) { const id = Date.now().toString(); state.users.push({ id, name: n, config: {...getUser().config}, periodHistory: [], logs: {} }); state.currentUserId = id; save(); } };
         window.switchUser = (id) => { state.currentUserId = id; save(); };
         window.deleteUser = (id) => { if(state.users.length <= 1) return alert("Mínimo un usuario"); if(confirm("¿Borrar?")) { state.users = state.users.filter(u => u.id !== id); state.currentUserId = state.users[0].id; save(); } };
         window.editUser = (id) => { const u = state.users.find(u => u.id === id); const n = prompt("Nuevo nombre:", u.name); if (n) { u.name = n; save(); } };
         
-        // TUTORIAL LOGIC
         window.nextSlide = () => { tutorialStep++; render(); };
         window.endTutorial = () => { state.showTutorial = false; tutorialStep = 0; save(); };
         window.openTutorial = () => { state.showTutorial = true; tutorialStep = 0; render(); };
@@ -254,23 +298,47 @@
             const app = document.getElementById('app');
             let html = '';
 
+            // --- VISTA BLOQUEO / SETUP PIN ---
+            if (state.view === 'locked' || state.view === 'setup_pin') {
+                const isSetup = state.view === 'setup_pin';
+                const dots = [0,1,2,3].map(i => `<div class="w-4 h-4 rounded-full border-2 border-slate-400 ${i < state.inputPin.length ? 'bg-slate-800 border-slate-800' : 'bg-transparent'} transition-all duration-200"></div>`).join('');
+                
+                const keys = [1,2,3,4,5,6,7,8,9].map(n => `<button onclick="typePin('${n}')" class="key-btn w-16 h-16 rounded-full bg-slate-50 text-xl font-bold text-slate-700 shadow-sm border border-slate-200 flex items-center justify-center mx-auto">${n}</button>`).join('');
+                
+                app.innerHTML = `
+                    <div class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-8 fade-in">
+                        <div class="mb-8 p-4 bg-slate-50 rounded-full text-slate-800">${ICONS.lock}</div>
+                        <h2 class="text-2xl font-bold mb-2 text-slate-800">${isSetup ? 'Crea tu PIN' : 'Lunea Bloqueado'}</h2>
+                        <p class="text-slate-400 mb-8 text-sm">${isSetup ? 'Introduce 4 dígitos para proteger tu app' : 'Ingresa tu PIN para acceder'}</p>
+                        
+                        <div class="flex gap-4 mb-10">${dots}</div>
+                        
+                        <div class="grid grid-cols-3 gap-6 mb-8 w-full max-w-xs">
+                            ${keys}
+                            <div class="w-16"></div>
+                            <button onclick="typePin('0')" class="key-btn w-16 h-16 rounded-full bg-slate-50 text-xl font-bold text-slate-700 shadow-sm border border-slate-200 flex items-center justify-center mx-auto">0</button>
+                            <button onclick="deletePinDigit()" class="key-btn w-16 h-16 rounded-full bg-transparent text-slate-400 flex items-center justify-center mx-auto hover:text-red-500 transition">${ICONS.delete}</button>
+                        </div>
+
+                        ${isSetup ? `<button onclick="setView('settings')" class="text-slate-400 text-sm underline mt-4">Cancelar</button>` : ''}
+                        
+                        <div class="mt-auto text-center text-xs text-slate-300">
+                             Desarrollado por <br><strong>Juan Miguel Rios Redondo</strong>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
             // TUTORIAL
             if (state.showTutorial) {
                 const slides = [
                     { t: "Bienvenida a Lunea", d: "Tu espacio privado para conocer tu ciclo. Sin internet, 100% seguro en tu dispositivo.", i: ICONS.heart, c: "text-rose-500 bg-rose-100" },
+                    { t: "Seguridad y Privacidad", d: "¡Nuevo! Ahora puedes proteger tu calendario con un PIN de 4 dígitos.", i: ICONS.lock, c: "text-slate-700 bg-slate-100" },
                     { t: "Historial Inteligente", d: "Marca tus inicios de periodo. Lunea calculará tu promedio real automáticamente.", i: ICONS.history, c: "text-indigo-500 bg-indigo-100" },
-                    { t: "Los Colores", d: `
-                        <ul class="text-left text-sm space-y-2 bg-slate-50 p-4 rounded-xl">
-                            <li class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-rose-500"></div> <b>Rojo:</b> Menstruación</li>
-                            <li class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-purple-400"></div> <b>Morado:</b> Fértil</li>
-                            <li class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-amber-400"></div> <b>Ámbar:</b> Lútea</li>
-                        </ul>
-                    `, i: ICONS.droplet, c: "text-teal-500 bg-teal-100" },
                     { t: "¡Empezar!", d: "Todo listo para comenzar.", i: ICONS.check, c: "text-green-500 bg-green-100" }
                 ];
-                
                 const slide = slides[tutorialStep];
-                
                 app.innerHTML = `
                     <div class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-8 text-center fade-in">
                         <div class="p-6 rounded-full mb-6 ${slide.c.split(' ')[1]} ${slide.c.split(' ')[0]}">${slide.i}</div>
@@ -324,8 +392,6 @@
                 const todayK = toKey(new Date());
                 const todayCD = getCycleDay(todayK);
                 const todayP = getPhase(todayK);
-
-                // Verificar si estamos en el mes actual para mostrar el botón HOY o no
                 const isCurrentMonth = todayK.startsWith(`${year}-${String(month+1).padStart(2,'0')}`);
 
                 let daysHtml = '';
@@ -341,7 +407,7 @@
                     
                     let dots = '';
                     if(p) dots += `<div class="w-1.5 h-1.5 rounded-full ${p.bg}"></div>`;
-                    if(log.pill) dots += `<div class="w-1.5 h-1.5 rounded-full bg-teal-400"></div>`; // Punto pastilla
+                    if(log.pill) dots += `<div class="w-1.5 h-1.5 rounded-full bg-teal-400"></div>`;
                     if(log.water || log.sleep) dots += `<div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div>`;
                     if(log.symptoms && log.symptoms.length > 0) dots += `<div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>`;
                     if(isPeriodStart) dots = `<div class="w-2 h-2 rounded-full bg-red-600 border border-white ring-1 ring-red-200"></div>` + dots;
@@ -474,6 +540,23 @@
                         <div class="flex justify-between mb-6"><button onclick="setView('calendar')">${ICONS.left}</button><h2 class="text-xl font-bold">Ajustes</h2><div></div></div>
                         
                         <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
+                            <h3 class="font-bold mb-4 text-slate-800 text-lg flex gap-2 items-center text-blue-600">${ICONS.lock} Seguridad</h3>
+                            ${state.pin ? `
+                                <div class="flex justify-between items-center bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                    <div class="flex gap-3 items-center">
+                                        <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                        <span class="text-sm font-bold text-blue-900">App Bloqueada con PIN</span>
+                                    </div>
+                                    <button onclick="removePin()" class="text-red-500 text-sm font-bold underline">Eliminar</button>
+                                </div>
+                            ` : `
+                                <button onclick="startPinSetup()" class="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 font-bold hover:bg-slate-50 hover:border-slate-300 transition flex items-center justify-center gap-2">
+                                    ${ICONS.plus} Crear PIN de Acceso
+                                </button>
+                            `}
+                        </div>
+
+                        <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
                              <h3 class="font-bold mb-4 flex gap-2 items-center text-rose-500 text-lg">${ICONS.history} Historial</h3>
                              <div class="bg-indigo-50 p-4 rounded-xl mb-4">
                                 <div class="text-xs text-indigo-400 font-bold uppercase mb-1">Promedio Calculado</div>
@@ -520,7 +603,10 @@
                         
                         <div class="text-center opacity-50 mb-12">
                             <button onclick="openTutorial()" class="underline text-sm">Ver Tutorial de Nuevo</button>
-                            <div class="text-[10px] mt-2">v5.8.0 Local Storage</div>
+                            <div class="text-[10px] mt-4">
+                                App desarrollada por <br>
+                                <strong class="text-slate-800 text-xs">Juan Miguel Rios Redondo</strong>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -529,13 +615,15 @@
             // MENU NAV
             const activeClass = "text-rose-500 scale-110 transition-transform";
             const inactiveClass = "text-slate-300";
-            html += `
-                <div class="fixed bottom-0 w-full bg-white border-t border-slate-100 flex justify-around p-2 pb-6 z-40 no-print shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
-                    <button onclick="setView('calendar')" class="flex flex-col items-center p-2 ${state.view === 'calendar' ? activeClass : inactiveClass}">${ICONS.calendar} <span class="text-[10px] font-bold mt-1">Hoy</span></button>
-                    <button onclick="setView('year')" class="flex flex-col items-center p-2 ${state.view === 'year' ? activeClass : inactiveClass}">${ICONS.grid} <span class="text-[10px] font-bold mt-1">Año</span></button>
-                    <button onclick="setView('settings')" class="flex flex-col items-center p-2 ${state.view === 'settings' ? activeClass : inactiveClass}">${ICONS.settings} <span class="text-[10px] font-bold mt-1">Perfil</span></button>
-                </div>
-            `;
+            if (state.view !== 'locked' && state.view !== 'setup_pin') {
+                html += `
+                    <div class="fixed bottom-0 w-full bg-white border-t border-slate-100 flex justify-around p-2 pb-6 z-40 no-print shadow-[0_-5px_20px_rgba(0,0,0,0.02)]">
+                        <button onclick="setView('calendar')" class="flex flex-col items-center p-2 ${state.view === 'calendar' ? activeClass : inactiveClass}">${ICONS.calendar} <span class="text-[10px] font-bold mt-1">Hoy</span></button>
+                        <button onclick="setView('year')" class="flex flex-col items-center p-2 ${state.view === 'year' ? activeClass : inactiveClass}">${ICONS.grid} <span class="text-[10px] font-bold mt-1">Año</span></button>
+                        <button onclick="setView('settings')" class="flex flex-col items-center p-2 ${state.view === 'settings' ? activeClass : inactiveClass}">${ICONS.settings} <span class="text-[10px] font-bold mt-1">Perfil</span></button>
+                    </div>
+                `;
+            }
 
             // MODAL
             if (state.selectedDate) {
