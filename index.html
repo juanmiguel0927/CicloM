@@ -320,6 +320,21 @@
             }
         };
 
+        // --- EVENT LISTENER TECLADO FÍSICO (NUEVO) ---
+        document.addEventListener('keydown', (e) => {
+            // Solo actuar si estamos en vista de bloqueo o configuración de PIN
+            if (state.view === 'locked' || state.view === 'setup_pin') {
+                // Números 0-9
+                if (e.key >= '0' && e.key <= '9') {
+                    window.typePin(e.key);
+                } 
+                // Borrar
+                else if (e.key === 'Backspace') {
+                    window.deletePinDigit();
+                }
+            }
+        });
+
         function getCycleDay(dateStr) {
             const user = getUser();
             const start = new Date(user.config.lastPeriod + 'T00:00:00');
