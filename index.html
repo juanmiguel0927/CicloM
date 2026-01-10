@@ -72,7 +72,42 @@
             unlock: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>',
             delete: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>',
             download: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
-            upload: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+            upload: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+            info: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+        };
+
+        // --- INFORMACIÓN DE FASES ---
+        const PHASE_INFO = {
+            'Menstruación': {
+                desc: 'El revestimiento uterino se desprende. Tu energía puede estar más baja. Es un buen momento para descansar e introspección.',
+                color: 'bg-rose-500',
+                text: 'text-rose-600',
+                light: 'bg-rose-50'
+            },
+            'Folicular': {
+                desc: 'Tu cuerpo se prepara para liberar un óvulo. Los niveles de estrógeno suben, aumentando tu energía y creatividad.',
+                color: 'bg-pink-300',
+                text: 'text-pink-600',
+                light: 'bg-pink-50'
+            },
+            'Fértil': {
+                desc: 'La ventana fértil ha comenzado. Te sientes más sociable y con energía. Hay alta probabilidad de embarazo.',
+                color: 'bg-purple-400',
+                text: 'text-purple-600',
+                light: 'bg-purple-50'
+            },
+            'Ovulación': {
+                desc: 'El ovario libera un óvulo. Es el pico máximo de fertilidad y libido en el ciclo.',
+                color: 'bg-purple-600',
+                text: 'text-purple-700',
+                light: 'bg-purple-100'
+            },
+            'Lútea': {
+                desc: 'Si no hubo embarazo, la progesterona sube. La energía baja y puedes sentir síntomas premenstruales (SPM).',
+                color: 'bg-amber-400',
+                text: 'text-amber-600',
+                light: 'bg-amber-50'
+            }
         };
 
         // --- ESTADO ---
@@ -608,10 +643,29 @@
                         .join('');
                 }
 
+                // Generar HTML de la Guía de Fases
+                const guideHtml = Object.entries(PHASE_INFO).map(([phase, info]) => `
+                    <div class="flex gap-3 mb-4 last:mb-0">
+                        <div class="w-4 h-4 rounded-full ${info.color} flex-shrink-0 mt-1"></div>
+                        <div>
+                            <div class="font-bold text-sm text-slate-800">${phase}</div>
+                            <div class="text-xs text-slate-500 leading-tight">${info.desc}</div>
+                        </div>
+                    </div>
+                `).join('');
+
                 html += `
                     <div class="p-6 max-w-md mx-auto animate-in">
                         <div class="flex justify-between mb-6"><button onclick="setView('calendar')">${ICONS.left}</button><h2 class="text-xl font-bold">Ajustes</h2><div></div></div>
                         
+                        <!-- SECCIÓN GUÍA DEL CICLO (NUEVO) -->
+                        <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
+                            <h3 class="font-bold mb-4 text-slate-800 text-lg flex gap-2 items-center text-purple-600">${ICONS.info} Guía del Ciclo</h3>
+                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                ${guideHtml}
+                            </div>
+                        </div>
+
                         <!-- BACKUP SECTION -->
                         <div class="bg-white p-5 rounded-2xl shadow-sm mb-6">
                             <h3 class="font-bold mb-4 text-slate-800 text-lg flex gap-2 items-center text-emerald-600">${ICONS.download} Copia de Seguridad</h3>
@@ -720,7 +774,11 @@
                 const log = user.logs[k] || {};
                 const displayDate = new Date(k + 'T00:00:00').toLocaleDateString('es-ES', {weekday:'long', day:'numeric'});
                 const isPeriodStart = user.periodHistory && user.periodHistory.includes(k);
+                const currentPhase = getPhase(k);
                 
+                // Obtener info detallada de la fase actual
+                const phaseDetails = PHASE_INFO[currentPhase?.l] || { desc: '', color: 'bg-slate-500', text: 'text-slate-600', light: 'bg-slate-100' };
+
                 // Síntomas HTML
                 const symptomsHtml = ['happy','sad','irritable','cramps','bloating','tired'].map(s => {
                     const isActive = (log.symptoms || []).includes(s);
@@ -752,6 +810,17 @@
                         <div class="w-full max-w-sm bg-white rounded-t-[2rem] p-6 h-[85vh] overflow-y-auto shadow-2xl" onclick="event.stopPropagation()">
                             <div class="flex justify-between items-center mb-6"><h3 class="text-2xl font-bold capitalize text-slate-800">${displayDate}</h3><button onclick="closeModal()" class="p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500">${ICONS.close}</button></div>
                             
+                            <!-- TARJETA DE FASE (NUEVO) -->
+                            ${currentPhase ? `
+                                <div class="${phaseDetails.light} p-4 rounded-xl mb-4 border border-opacity-50 border-${currentPhase.bg.split('-')[1]}-200">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <div class="w-2 h-2 rounded-full ${phaseDetails.color}"></div>
+                                        <h4 class="font-bold ${phaseDetails.text}">${currentPhase.l}</h4>
+                                    </div>
+                                    <p class="text-xs text-slate-600 leading-snug">${phaseDetails.desc}</p>
+                                </div>
+                            ` : ''}
+
                             <!-- SECCIÓN INICIO DE PERIODO -->
                             <div class="bg-rose-50 p-5 rounded-2xl mb-4 border border-rose-100 relative overflow-hidden">
                                 ${isPeriodStart ? '<div class="absolute -right-4 -top-4 w-16 h-16 bg-rose-200 rounded-full opacity-50"></div>' : ''}
