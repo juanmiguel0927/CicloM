@@ -63,6 +63,7 @@
     <input type="file" id="importFile" class="hidden" accept=".json" onchange="importData(this)">
 
     <script>
+        // --- STREAMING_CHUNK:Defining Constants and Icons... ---
         // --- INYECCIÓN PWA ---
         if (!document.getElementById('lunea-manifest')) {
             const manifest = {
@@ -112,7 +113,8 @@
             sparkles: '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>',
             shieldCheck: '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>',
             shield: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
-            info: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+            info: '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+            delete: '<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>'
         };
 
         const TIPS = {
@@ -134,6 +136,7 @@
 
         const BABY_SIZES = [ { w: 4, s: 'Semilla de amapola 🌑' }, { w: 6, s: 'Guisante dulce 🟢' }, { w: 8, s: 'Frambuesa 🍓' }, { w: 10, s: 'Fresa 🍓' }, { w: 12, s: 'Ciruela 🍑' }, { w: 14, s: 'Limón 🍋' }, { w: 16, s: 'Aguacate 🥑' }, { w: 18, s: 'Pimiento 🫑' }, { w: 20, s: 'Plátano 🍌' }, { w: 24, s: 'Mazorca 🌽' }, { w: 28, s: 'Berenjena 🍆' }, { w: 32, s: 'Calabaza 🎃' }, { w: 36, s: 'Papaya 🍈' }, { w: 40, s: 'Sandía 🍉' } ];
 
+        // --- STREAMING_CHUNK:Initializing State and Data Management... ---
         let tutorialStep = 0; 
         const DB_KEY = 'lunea_master_db'; 
         const LEGACY_KEYS = ['lunea_v59_pin', 'lunea_v58_pill', 'lunea_v57_final']; 
@@ -190,14 +193,6 @@
             if (count > 0) user.config.cycleLen = Math.round(totalDays / count);
         }
 
-        function togglePeriodStart(dateStr) {
-            const user = getUser();
-            if (!user.periodHistory) user.periodHistory = [];
-            if (user.periodHistory.includes(dateStr)) { user.periodHistory = user.periodHistory.filter(d => d !== dateStr); } 
-            else { user.periodHistory.push(dateStr); if(user.config.pregnancyMode) user.config.pregnancyMode = false; }
-            recalculateCycleStats(user); save();
-        }
-
         function getCycleDay(dateStr) {
             const user = getUser();
             const start = new Date(user.config.lastPeriod + 'T00:00:00');
@@ -228,7 +223,7 @@
             return { ...PHASE_INFO['Folicular'], isStart, l: 'Folicular', risk: (cd >= ov - 7 ? 'fertile' : 'safe') };
         }
 
-        // --- ACCIONES ---
+        // --- STREAMING_CHUNK:Implementing Action Handlers... ---
         window.setView = (v) => { state.view = v; render(); };
         window.toggleDarkMode = () => { state.darkMode = !state.darkMode; document.documentElement.classList.toggle('dark'); save(); };
         window.toggleBlur = () => { state.isBlurred = !state.isBlurred; render(); };
@@ -255,14 +250,14 @@
             const u = getUser();
             if (!u.logs[key]) u.logs[key] = {};
             if (field === 'water' || field === 'sleep') {
-                let current = u.logs[key][field] || 0;
-                u.logs[key][field] = val === 'inc' ? current + 1 : Math.max(0, current - 1);
-            } else if (field === 'pill') { u.logs[key].pill = val !== undefined ? val : !u.logs[key].pill; } 
-            else if (field === 'pregnancyTest') {
+            } else if (field === 'pregnancyTest') {
                 if (u.logs[key].pregnancyTest === val) delete u.logs[key].pregnancyTest; else u.logs[key].pregnancyTest = val;
             } else if (field === 'symptoms') {
                 let cur = u.logs[key].symptoms || [];
                 u.logs[key].symptoms = cur.includes(val) ? cur.filter(s => s !== val) : [...cur, val];
+            } else if (field === 'intimacy') {
+                let cur = u.logs[key].intimacy || [];
+                u.logs[key].intimacy = cur.includes(val) ? cur.filter(s => s !== val) : [...cur, val];
             } else { u.logs[key][field] = val; }
             save();
         };
@@ -333,7 +328,7 @@
         };
         window.clearContractions = () => { if(confirm('¿Limpiar historial?')) { getUser().pregnancyData.contractions = []; save(); } };
 
-        // --- RENDERIZADO PRINCIPAL ---
+        // --- STREAMING_CHUNK:Rendering PDF and Locked Views... ---
         function render() {
             const app = document.getElementById('app');
             let html = '';
@@ -403,6 +398,7 @@
                 return;
             }
 
+            // --- STREAMING_CHUNK:Rendering Pregnancy and Calendar Views... ---
             if (state.view === 'pregnancy_tools') {
                 const u = getUser(), p = u.pregnancyData;
                 const kickBtnText = p.kickStart ? `Patada #${p.kicks + 1}` : 'Empezar a Contar';
@@ -457,6 +453,7 @@
                     if(log.pregnancyTest === 'positive') dots += `<div class="w-2 h-2 rounded-full bg-fuchsia-500 border border-white dark:border-darkCard"></div>`;
                     if(log.pregnancyTest === 'negative') dots += `<div class="w-1.5 h-1.5 rounded-full bg-slate-400"></div>`;
                     if(log.symptoms && log.symptoms.length > 0) dots += `<div class="w-1.5 h-1.5 rounded-full bg-purple-500"></div>`;
+                    if(log.intimacy && log.intimacy.length > 0) dots += `<div class="w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_2px_rgba(251,113,133,0.8)]"></div>`;
                     if(isStart && !user.config.pregnancyMode) dots = `<div class="w-2 h-2 rounded-full bg-red-600 border border-white dark:border-darkCard ring-1 ring-red-200"></div>` + dots;
 
                     let fertilityIcon = '';
@@ -487,6 +484,7 @@
 
                 html += `<div class="p-4 max-w-md mx-auto animate-in">${alertsHtml}${topCardHtml}${tipHtml}<div class="p-4 bg-white dark:bg-darkCard rounded-3xl shadow-sm mb-6 border border-slate-50 dark:border-darkBorder"><div class="flex justify-between items-center mb-4"><button onclick="setMonth(-1)" class="p-2 text-slate-400 dark:text-darkTextMuted">${ICONS.left}</button><div class="text-center"><div class="font-bold capitalize text-lg dark:text-darkText">${state.currentMonth.toLocaleDateString('es-ES', {month:'long', year:'numeric'})}</div>${!isCurrentMonth ? `<button onclick="goToToday()" class="mt-1 text-[10px] text-white bg-theme-500 px-3 py-1 rounded-full font-bold shadow-sm">Volver a Hoy</button>` : ''}</div><button onclick="setMonth(1)" class="p-2 text-slate-400 dark:text-darkTextMuted">${ICONS.right}</button></div><div class="grid grid-cols-7 text-center text-xs text-slate-400 dark:text-darkTextMuted font-bold mb-2"><span>D</span><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span></div><div class="grid grid-cols-7 gap-1">${daysHtml}</div></div></div>`;
             }
+            // --- STREAMING_CHUNK:Rendering Settings and Year Views... ---
             else if (state.view === 'year') {
                 let monthsHtml = '';
                 for(let m=0; m<12; m++) {
@@ -535,6 +533,27 @@
                 }
                 if(!chartBarsHtml) chartBarsHtml = `<div class="w-full text-center text-sm text-slate-400 dark:text-darkTextMuted py-8">Registra al menos 2 periodos para ver tu gráfica.</div>`;
 
+                let totalEncounters = 0;
+                let painCount = 0;
+                let phaseEncounters = { 'Folicular': 0, 'Fértil': 0, 'Ovulación': 0, 'Lútea': 0, 'Menstruación': 0 };
+                Object.entries(user.logs).forEach(([dKey, lData]) => {
+                    if (lData.intimacy && lData.intimacy.length > 0) {
+                        if (lData.intimacy.some(i => ['protected', 'unprotected', 'solo'].includes(i))) {
+                            totalEncounters++;
+                            const phase = getPhase(dKey);
+                            if (phase && phaseEncounters[phase.l] !== undefined) phaseEncounters[phase.l]++;
+                        }
+                        if (lData.intimacy.includes('pain')) painCount++;
+                    }
+                });
+                let topPhase = Object.keys(phaseEncounters).reduce((a, b) => phaseEncounters[a] > phaseEncounters[b] ? a : b);
+                if (phaseEncounters[topPhase] === 0) topPhase = 'N/A';
+                
+                let extraStats = '';
+                if (painCount > 0) extraStats = `<div class="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">⚠️ <b>Alerta de Salud:</b> Has registrado dolor o incomodidad íntima en ${painCount} ocasión(es). Si el dolor persiste (dispareunia), es altamente recomendable consultarlo con un profesional de la salud.</div>`;
+
+                let intimacyStatsHtml = `<div class="mt-6 border-t border-slate-100 dark:border-darkBorder pt-4"><h4 class="text-xs font-bold text-slate-500 dark:text-darkTextMuted mb-4 flex items-center gap-1">🔥 Sexualidad y Ciclo</h4><div class="grid grid-cols-2 gap-4"><div class="bg-rose-50 dark:bg-rose-900/20 p-3 rounded-xl border border-rose-100 dark:border-rose-800"><div class="text-[10px] text-rose-500 uppercase font-bold mb-1">Encuentros Registrados</div><div class="text-2xl font-black text-rose-600">${totalEncounters}</div></div><div class="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-xl border border-purple-100 dark:border-purple-800"><div class="text-[10px] text-purple-500 uppercase font-bold mb-1">Fase más activa</div><div class="text-sm font-black text-purple-600 mt-1">${topPhase}</div></div></div>${extraStats}<p class="text-[10px] text-slate-400 dark:text-darkTextMuted mt-3 italic">* Es común notar un aumento de libido cerca de la ovulación debido al pico natural de estrógenos y testosterona.</p></div>`;
+
                 let planningHtml = '';
                 if (!user.config.pregnancyMode) {
                     let currentDate = new Date(user.config.lastPeriod + 'T00:00:00');
@@ -563,7 +582,7 @@
                     <div class="p-6 max-w-md mx-auto animate-in">
                         <div class="flex justify-between mb-6 text-slate-800 dark:text-darkText"><button onclick="setView('calendar')">${ICONS.left}</button><h2 class="text-xl font-bold">Perfil y Ajustes</h2><div></div></div>
                         
-                        <div class="bg-white dark:bg-darkCard p-5 rounded-2xl shadow-sm mb-6 border border-slate-50 dark:border-darkBorder"><h3 class="font-bold mb-4 text-slate-800 dark:text-darkText text-lg flex gap-2 items-center"><span class="text-theme-500">${ICONS.history}</span> Panel de Salud</h3><div class="bg-theme-50 dark:bg-theme-900/20 p-4 rounded-xl mb-4 text-center"><div class="text-xs text-theme-500 font-bold uppercase tracking-wider">Ciclo Promedio Actual</div><div class="text-3xl font-black text-theme-700 dark:text-theme-300 my-1">${user.config.cycleLen} <span class="text-sm font-normal text-theme-500">días</span></div></div><h4 class="text-xs font-bold text-slate-400 text-center">Variación de ciclos</h4><div class="flex items-end justify-around h-40 border-b border-slate-200 pb-2 gap-2">${chartBarsHtml}</div>${bbtChartHtml}</div>
+                        <div class="bg-white dark:bg-darkCard p-5 rounded-2xl shadow-sm mb-6 border border-slate-50 dark:border-darkBorder"><h3 class="font-bold mb-4 text-slate-800 dark:text-darkText text-lg flex gap-2 items-center"><span class="text-theme-500">${ICONS.history}</span> Panel de Salud</h3><div class="bg-theme-50 dark:bg-theme-900/20 p-4 rounded-xl mb-4 text-center"><div class="text-xs text-theme-500 font-bold uppercase tracking-wider">Ciclo Promedio Actual</div><div class="text-3xl font-black text-theme-700 dark:text-theme-300 my-1">${user.config.cycleLen} <span class="text-sm font-normal text-theme-500">días</span></div></div><h4 class="text-xs font-bold text-slate-400 text-center">Variación de ciclos</h4><div class="flex items-end justify-around h-40 border-b border-slate-200 pb-2 gap-2">${chartBarsHtml}</div>${bbtChartHtml}${intimacyStatsHtml}</div>
                         <div class="bg-white dark:bg-darkCard p-5 rounded-2xl shadow-sm mb-6 border border-slate-50 dark:border-darkBorder"><h3 class="font-bold mb-2 text-slate-800 dark:text-darkText text-lg flex gap-2 items-center"><span class="text-fuchsia-500">${ICONS.baby}</span> Planificación Familiar</h3><p class="text-xs text-slate-400 mb-4 leading-snug">Posibles fechas de parto si concibes en tus próximos ciclos.</p><div class="bg-slate-50 dark:bg-darkBg rounded-xl border border-slate-100 dark:border-darkBorder">${planningHtml}</div></div>
                         
                         <div class="bg-white dark:bg-darkCard p-5 rounded-2xl shadow-sm mb-6 border border-slate-50 dark:border-darkBorder">
@@ -598,6 +617,7 @@
             
             html += `</div>`; 
 
+            // --- STREAMING_CHUNK:Rendering Detail Modal and Bootstrapping... ---
             if (state.view !== 'locked' && state.view !== 'setup_pin' && state.view !== 'pdf' && state.view !== 'pregnancy_tools') {
                 const activeClass = "text-theme-500 dark:text-theme-400 scale-110 transition-transform";
                 const inactiveClass = "text-slate-300 dark:text-slate-500";
@@ -634,7 +654,22 @@
                 const testResult = log.pregnancyTest;
                 const pregnancyTestSection = `<div class="bg-fuchsia-50 dark:bg-fuchsia-900/20 p-4 rounded-2xl mb-4 border border-fuchsia-100 dark:border-fuchsia-900/50"><div class="flex items-center gap-2 mb-3"><div class="text-fuchsia-500">${ICONS.baby}</div><h4 class="text-sm font-bold text-fuchsia-700 dark:text-fuchsia-400 uppercase tracking-wider">Prueba de Embarazo</h4></div><div class="flex gap-2"><button onclick="updateLog('${k}', 'pregnancyTest', 'negative')" class="flex-1 py-2.5 rounded-xl text-sm font-bold transition flex justify-center items-center gap-2 ${testResult === 'negative' ? 'bg-slate-800 text-white shadow-md' : 'bg-white dark:bg-darkCard text-slate-500 border border-slate-200'}">Negativa</button><button onclick="updateLog('${k}', 'pregnancyTest', 'positive')" class="flex-1 py-2.5 rounded-xl text-sm font-bold transition flex justify-center items-center gap-2 ${testResult === 'positive' ? 'bg-fuchsia-500 text-white shadow-lg scale-105' : 'bg-white dark:bg-darkCard text-fuchsia-500 border border-fuchsia-200'}">Positiva</button></div></div>`;
 
-                html += `<div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in" onclick="closeModal()"><div class="w-full max-w-sm bg-white dark:bg-darkBg rounded-t-[2rem] p-6 h-[85vh] overflow-y-auto shadow-2xl" onclick="event.stopPropagation()"><div class="flex justify-between items-center mb-6"><h3 class="text-2xl font-bold capitalize text-slate-800 dark:text-darkText">${displayDate}</h3><button onclick="closeModal()" class="p-2 bg-slate-100 dark:bg-darkCard rounded-full text-slate-500 transition">${ICONS.close}</button></div>${currentPhase && !user.config.pregnancyMode ? `<div class="${phaseDetails.light} p-4 rounded-xl mb-4 border border-opacity-50"><div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full ${phaseDetails.color}"></div><h4 class="font-bold ${phaseDetails.text}">${currentPhase.l}</h4></div><p class="text-xs text-slate-600 dark:text-slate-400 leading-snug">${phaseDetails.desc}</p></div>` : ''}${!user.config.pregnancyMode ? `<div class="bg-rose-50 dark:bg-rose-900/20 p-5 rounded-2xl mb-4 border border-rose-100 dark:border-rose-900 relative overflow-hidden transition-all">${isStart ? '<div class="absolute -right-4 -top-4 w-16 h-16 bg-rose-200 dark:bg-rose-800 rounded-full opacity-50"></div>' : ''}<div class="flex justify-between items-center relative z-10"><div class="flex items-center gap-4"><div class="bg-white dark:bg-darkCard p-3 rounded-full text-rose-500 shadow-sm">${ICONS.droplet}</div><div><h4 class="font-bold text-slate-800 dark:text-darkText">Menstruación</h4><p class="text-xs text-slate-500 dark:text-darkTextMuted">¿Inició hoy?</p></div></div><div class="relative inline-block w-14 h-8 align-middle select-none"><input type="checkbox" id="periodToggle" class="toggle-checkbox absolute block w-8 h-8 rounded-full bg-white dark:bg-darkCard border-4 appearance-none cursor-pointer border-slate-300 transition-all duration-300" ${isStart ? 'checked' : ''} onclick="handlePeriodToggle('${k}')"/><label for="periodToggle" class="toggle-label block overflow-hidden h-8 rounded-full bg-slate-300 dark:bg-slate-600 cursor-pointer transition-all duration-300"></label></div></div>${isStart ? '<p class="text-xs text-rose-600 dark:text-rose-400 mt-3 font-bold text-center bg-white/60 dark:bg-darkBg/60 py-1.5 rounded-lg fade-in">✅ Inicio de ciclo registrado</p>' : ''}</div>` : ''}${pregnancyTestSection}${pillSection}${fertilityHtml}<div class="grid grid-cols-2 gap-4 mb-4"><div class="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl border border-emerald-100 dark:border-emerald-900"><label class="text-[10px] font-bold text-emerald-500 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1 mb-2">⚖️ Peso (kg)</label><input type="number" step="0.1" value="${log.weight || ''}" onchange="updateLog('${k}', 'weight', this.value)" placeholder="60.5" class="w-full text-center bg-white dark:bg-darkBg p-2 rounded-xl border border-emerald-100 dark:border-emerald-800 font-black text-slate-700 dark:text-darkText focus:outline-none"></div><div class="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-2xl border border-indigo-100 dark:border-indigo-900"><div class="text-[10px] font-bold text-indigo-400 dark:text-indigo-300 mb-2 flex gap-1 uppercase tracking-wider text-center w-full justify-center">${ICONS.moon} Sueño</div><div class="flex items-center justify-between w-full"><button onclick="updateLog('${k}', 'sleep', 'dec')" class="w-6 h-6 bg-white dark:bg-darkCard rounded-full font-bold shadow-sm text-indigo-500">-</button><span class="font-black text-base text-slate-700 dark:text-darkText">${log.sleep||0}h</span><button onclick="updateLog('${k}', 'sleep', 'inc')" class="w-6 h-6 bg-indigo-500 text-white rounded-full font-bold shadow-sm">+</button></div></div></div><div class="mb-6"><label class="text-xs font-bold text-slate-400 dark:text-darkTextMuted mb-2 block uppercase tracking-wider">Notas del día</label><textarea onchange="updateLog('${k}', 'notes', this.value)" class="w-full p-4 bg-slate-50 dark:bg-darkBg dark:text-darkText border border-slate-200 dark:border-darkBorder rounded-2xl focus:outline-none focus:border-theme-500 transition" rows="3" placeholder="¿Cómo te sentiste hoy?">${log.notes||''}</textarea></div><div class="grid grid-cols-3 gap-3 mb-8">${symptomsHtml}</div><button onclick="closeModal()" class="w-full py-4 bg-theme-600 text-white rounded-2xl font-bold shadow-xl active:scale-95 transition">Guardar Cambios</button></div></div>`;
+                const intimacyOptions = [
+                    { id: 'protected', label: 'Protegido', icon: '🛡️' },
+                    { id: 'unprotected', label: 'Sin protección', icon: '⚠️' },
+                    { id: 'solo', label: 'A Solas', icon: '✨' },
+                    { id: 'high_libido', label: 'Deseo Alto', icon: '🔥' },
+                    { id: 'orgasm', label: 'Orgasmo', icon: '🎆' },
+                    { id: 'pain', label: 'Dolor', icon: '🩹' }
+                ];
+                const intimacyHtml = intimacyOptions.map(opt => {
+                    const isActive = (log.intimacy || []).includes(opt.id);
+                    const activeColor = 'bg-rose-100 dark:bg-rose-900/40 border-rose-300 text-rose-700 scale-105';
+                    return `<button onclick="updateLog('${k}', 'intimacy', '${opt.id}')" class="p-2 rounded-xl border flex flex-col items-center justify-center gap-1 transition shadow-sm ${isActive ? activeColor : 'border-slate-100 dark:border-darkBorder text-slate-500 dark:text-darkTextMuted bg-white dark:bg-darkCard'}"><span class="text-xl mb-0.5">${opt.icon}</span><span class="text-[9px] font-bold text-center leading-tight">${opt.label}</span></button>`;
+                }).join('');
+                const intimacySection = `<div class="bg-rose-50 dark:bg-rose-900/10 p-4 rounded-2xl mb-4 border border-rose-100 dark:border-rose-900/50"><h4 class="text-[10px] font-bold text-rose-500 dark:text-rose-400 uppercase tracking-wider mb-3 flex items-center gap-1">🔥 Salud Íntima y Libido</h4><div class="grid grid-cols-3 gap-2">${intimacyHtml}</div></div>`;
+
+                html += `<div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in" onclick="closeModal()"><div class="w-full max-w-sm bg-white dark:bg-darkBg rounded-t-[2rem] p-6 h-[85vh] overflow-y-auto shadow-2xl" onclick="event.stopPropagation()"><div class="flex justify-between items-center mb-6"><h3 class="text-2xl font-bold capitalize text-slate-800 dark:text-darkText">${displayDate}</h3><button onclick="closeModal()" class="p-2 bg-slate-100 dark:bg-darkCard rounded-full text-slate-500 transition">${ICONS.close}</button></div>${currentPhase && !user.config.pregnancyMode ? `<div class="${phaseDetails.light} p-4 rounded-xl mb-4 border border-opacity-50"><div class="flex items-center gap-2 mb-1"><div class="w-2 h-2 rounded-full ${phaseDetails.color}"></div><h4 class="font-bold ${phaseDetails.text}">${currentPhase.l}</h4></div><p class="text-xs text-slate-600 dark:text-slate-400 leading-snug">${phaseDetails.desc}</p></div>` : ''}${!user.config.pregnancyMode ? `<div class="bg-rose-50 dark:bg-rose-900/20 p-5 rounded-2xl mb-4 border border-rose-100 dark:border-rose-900 relative overflow-hidden transition-all">${isStart ? '<div class="absolute -right-4 -top-4 w-16 h-16 bg-rose-200 dark:bg-rose-800 rounded-full opacity-50"></div>' : ''}<div class="flex justify-between items-center relative z-10"><div class="flex items-center gap-4"><div class="bg-white dark:bg-darkCard p-3 rounded-full text-rose-500 shadow-sm">${ICONS.droplet}</div><div><h4 class="font-bold text-slate-800 dark:text-darkText">Menstruación</h4><p class="text-xs text-slate-500 dark:text-darkTextMuted">¿Inició hoy?</p></div></div><div class="relative inline-block w-14 h-8 align-middle select-none"><input type="checkbox" id="periodToggle" class="toggle-checkbox absolute block w-8 h-8 rounded-full bg-white dark:bg-darkCard border-4 appearance-none cursor-pointer border-slate-300 transition-all duration-300" ${isStart ? 'checked' : ''} onclick="handlePeriodToggle('${k}')"/><label for="periodToggle" class="toggle-label block overflow-hidden h-8 rounded-full bg-slate-300 dark:bg-slate-600 cursor-pointer transition-all duration-300"></label></div></div>${isStart ? '<p class="text-xs text-rose-600 dark:text-rose-400 mt-3 font-bold text-center bg-white/60 dark:bg-darkBg/60 py-1.5 rounded-lg fade-in">✅ Inicio de ciclo registrado</p>' : ''}</div>` : ''}${pregnancyTestSection}${pillSection}${intimacySection}${fertilityHtml}<div class="grid grid-cols-2 gap-4 mb-4"><div class="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-2xl border border-emerald-100 dark:border-emerald-900"><label class="text-[10px] font-bold text-emerald-500 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1 mb-2">⚖️ Peso (kg)</label><input type="number" step="0.1" value="${log.weight || ''}" onchange="updateLog('${k}', 'weight', this.value)" placeholder="60.5" class="w-full text-center bg-white dark:bg-darkBg p-2 rounded-xl border border-emerald-100 dark:border-emerald-800 font-black text-slate-700 dark:text-darkText focus:outline-none"></div><div class="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-2xl border border-indigo-100 dark:border-indigo-900"><div class="text-[10px] font-bold text-indigo-400 dark:text-indigo-300 mb-2 flex gap-1 uppercase tracking-wider text-center w-full justify-center">${ICONS.moon} Sueño</div><div class="flex items-center justify-between w-full"><button onclick="updateLog('${k}', 'sleep', 'dec')" class="w-6 h-6 bg-white dark:bg-darkCard rounded-full font-bold shadow-sm text-indigo-500">-</button><span class="font-black text-base text-slate-700 dark:text-darkText">${log.sleep||0}h</span><button onclick="updateLog('${k}', 'sleep', 'inc')" class="w-6 h-6 bg-indigo-500 text-white rounded-full font-bold shadow-sm">+</button></div></div></div><div class="mb-6"><label class="text-xs font-bold text-slate-400 dark:text-darkTextMuted mb-2 block uppercase tracking-wider">Notas del día</label><textarea onchange="updateLog('${k}', 'notes', this.value)" class="w-full p-4 bg-slate-50 dark:bg-darkBg dark:text-darkText border border-slate-200 dark:border-darkBorder rounded-2xl focus:outline-none focus:border-theme-500 transition" rows="3" placeholder="¿Cómo te sentiste hoy?">${log.notes||''}</textarea></div><div class="grid grid-cols-3 gap-3 mb-8">${symptomsHtml}</div><button onclick="closeModal()" class="w-full py-4 bg-theme-600 text-white rounded-2xl font-bold shadow-xl active:scale-95 transition">Guardar Cambios</button></div></div>`;
             }
 
             app.innerHTML = html;
